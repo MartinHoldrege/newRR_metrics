@@ -9,8 +9,9 @@ belongs to one of ~100k unique soil units)
 
 // Constants
 
-var dirAsset = 'projects/gee-guest/assets/newRR_metrics/';
-
+var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
+var scale = 30;
+var testRun = true; //is this just a test run--if so code run for a very small area
 
 /***************************
 
@@ -23,7 +24,8 @@ load the data
 // has a number which corresponds to the nrcs soil unit polygon that it belongs to. 
 // resolution is 30 m. Certain 'non drylands' have been masked out for this analysis. 
 
-var suid1 = ee.Image(dirAsset + 'suid/gsu_masked_v20220314')
+var suid1 = ee.Image(pathAsset + 'suid/gsu_masked_v20220314')
+  .rename('suid')
   .toInt(); // unique values so integer better?
 
 Map.addLayer(suid1, {min: 0, max: 100000}, 'suid', false);
@@ -31,7 +33,17 @@ Map.addLayer(suid1, {min: 0, max: 100000}, 'suid', false);
 // region of interest
 
 var biome = ee.FeatureCollection("projects/gee-guest/assets/SEI/US_Sagebrush_Biome_2019"); // provided by DT
-var region = biome.geometry();
+
+
+if (testRun) {
+  var region = /* color: #d63000 */ee.Geometry.Polygon(
+        [[[-111.87737424895596, 41.756976770460874],
+          [-111.87634428069424, 41.719573725767205],
+          [-111.78811033294033, 41.716498534131],
+          [-111.77197416350674, 41.754927852691175]]]);
+} else {
+  var region = biome.geometry();
+}
 
 Map.addLayer(region, {}, 'roi', false);
 
@@ -63,15 +75,30 @@ Prepare data for summarizing
 
 */
 
-var rapCov3 = rapCov2.addBands(suid1.rename('suid'));
+var rapCov3 = rapCov2.addBands(suid1);
 
-print(rapCov3)
+print(rapCov3);
 
+/*
 
+summarizing by suid
 
+*/
 
+// the first band is the one that 
+var afgM1 = rapCov3.select('AFG', 'suid').reduceRegion({
+  reducer: ee.Reducer.mean().group({
+    groupField: 1,
+    groupName: 'suid',
+  }),
+  geometry: region,
+  scale: scale,
+  maxPixels: 1e12
+});
 
-
+if (testRun) {
+  print(afgM1);
+}
 
 
 
