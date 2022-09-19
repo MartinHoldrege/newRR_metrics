@@ -4,7 +4,33 @@ Script started 9/8/2022 by Martin Holdrege
 Purpose--summarise landcover datasets by a classification raster (i.e. each pixel
 belongs to one of ~100k unique soil units)
 
+
 */
+
+
+/*
+Some notes (9/19/2022)
+
+1979---2020 (is the range they're simulating for)
+
+each year avg cover, for each year*identifier
+
+seperate dataframe
+% burned of that identifier for that year. 
+
+seperate dataset--just looking at fires
+for each combination of simulation unit and fire get
+the average cover for that polygon for each year. also
+year for each fire id, and area of each polygon. 
+
+first create new fire polygon layer which is each unique combination of fires.
+
+Then each combination of simulation unit and fire unit. 
+Then get data for each of those. 
+
+*/
+
+
 
 
 // Constants
