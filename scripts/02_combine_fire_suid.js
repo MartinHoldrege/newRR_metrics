@@ -92,7 +92,7 @@ Map.addLayer(region, {}, 'roi', false);
 var cwf1 = ee.FeatureCollection(pathAsset + 'usgs_combined_wildland_fire_complete')
   .filterBounds(region);
   
-
+Map.addLayer(cwf1, {}, 'cwf', false);
 
 // rap cover data
 
