@@ -28,6 +28,9 @@ first create new fire polygon layer which is each unique combination of fires.
 Then each combination of simulation unit and fire unit. 
 Then get data for each of those. 
 
+
+Next step--determine how much area for each suidBin code, and output this
+(this will be an important table)
 */
 
 
@@ -35,7 +38,7 @@ Then get data for each of those.
 
 var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
 var scale = 30;
-var testRun = false; //is this just a test run--if so code run for a very small area
+var testRun = true; //is this just a test run--if so code run for a very small area
 // the way the code is currently designed it will only work for up to 35 year period
 // (due to how the unique codes for each fire/year and suid combo are created)
 var startYear = 1986;
@@ -189,15 +192,18 @@ var suidLong = suid1
   // original suid's go from ~1 to ~100k, now add 100k, so that all id's
   // have the same number of digits (so can later be extracted from a code)
   .add(ee.Number(100000).int64())
-  .multiply(10^12);
+  .multiply(ee.Number(10).pow(11));
   
 // combined suid and cwf binary codes
 var suidBin = suidLong
   // updating mask so that only adding together areas that have an suid & that have burned
   .updateMask(maskFire)
-  // first 6 digits are by suid the remaning ones are the the fire binary code
+  // first 6 digits are by suid the remaning 11 are the the fire binary code.
+  // b/ there are only 11 digits of space, this code will break down if the sequence
+  // of years is longer than 35 (ie 2^35 would fit, but could would run into problems
+  // if it were 36 years). 
   .add(cwfBinImageM)
-  .rename('suid_bin');
+  .rename('suidBin');
   
 Map.addLayer(suidBin, {palette: ['Black']}, 'suidBin', false);
 
@@ -208,9 +214,9 @@ summarizing by suid
 */
 var rapCov3 = rapCov2.addBands(suidBin);
 
-print(rapCov3);
+// print(rapCov3);
 // the first band is the one that 
-var afgM1 = rapCov3.select('AFG', 'suid').reduceRegion({
+var afgM1 = rapCov3.select('AFG', 'suidBin').reduceRegion({
   reducer: ee.Reducer.mean().group({
     groupField: 1,
     groupName: 'suidBin',
