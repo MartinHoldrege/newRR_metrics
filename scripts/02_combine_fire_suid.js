@@ -38,10 +38,10 @@ Next step--determine how much area for each suidBin code, and output this
 
 var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
 var scale = 30;
-var testRun = true; // false; // is this just a test run--if so code run for a very small area
+var testRun = false; // false; // is this just a test run--if so code run for a very small area
 // the way the code is currently designed it will only work for up to 35 year period
 // (due to how the unique codes for each fire/year and suid combo are created)
-var runExports = false; // whether to export csv files
+var runExports = true; // whether to export csv files
 var startYear = 1986;
 var endYear = 2020;
 
@@ -119,6 +119,65 @@ var rapCov2 = rapCov1
 
 print(rapCov2)
 //print(rapCov2.bandNames())
+
+
+/*
+
+Functions
+
+some functions here rely on objects in the global environment (hence they can't be put in a seperate
+script and be sourced)
+*/
+
+var meanBySuidBin = function(image, bandName) {
+
+  // this creates a dictionary, mean value of the image for each
+  // unique set of pixels (as defined by suidBin)
+  var meanDict = ee.Image(image).select(bandName, 'suidBin').reduceRegion({
+    reducer: ee.Reducer.mean().group({
+      groupField: 1,
+      groupName: 'suidBin',
+    }),
+    geometry: region,
+    scale: scale,
+    maxPixels: 1e12
+  });
+  
+  // return a list where each element is a feature
+  // that contains the mean cover value, name of the image band the mean is of
+  // the suidBin, and the year the image is from
+  var meanList = ee.List(meanDict.get('groups')).map(function (x) {
+    var f = ee.Feature(null, 
+      // using this code here to rename the parts as needed
+      {suidBin: ee.Number(ee.Dictionary(x).get('suidBin')).toInt64(),
+      // area in m^2
+        meanValue: ee.Dictionary(x).get('mean'),
+        bandName: bandName,
+        year: ee.Image(image).get('year')
+      });
+    return f;
+    });
+  
+  return meanList;
+};
+
+// create feature collection where each feature is the mean cover for each year and suidbin
+var mapOverYears = function(ic, bandName) {
+  
+  var fc = ic // image collection (i.e. rap cover)
+    // creating list so that the output of map doesn't have to be an image or feature
+    .toList(years.length()) 
+    // list of lists where each list element is a list for a given year
+    // of features giving mean cover for a given suid
+    .map(function(image) {
+      return meanBySuidBin(image, bandName);
+    })
+    // flatten so that features from different years are in the same list
+    .flatten(); 
+  
+  return fc;
+};
+
 
 /*
 
@@ -276,69 +335,34 @@ var rapCov3 = rapCov2.map(function(x) {
   return ee.Image(x).addBands(suidBin).mask(maskSuidBin);
 });
 
-print(rapCov3)
+print(rapCov3);
 
 
+// annuals
+var meanAFGfc = mapOverYears(rapCov3, 'AFG');
 
+// perennials
+var meanPFGfc = mapOverYears(rapCov3, 'PFG');
 
-var meanBySuidBin = function(image, bandName) {
-  // the first band is the one that taking an average of
+// shrubs
+var meanSHRfc = mapOverYears(rapCov3, 'SHR');
+
+// trees
+var meanTREfc = mapOverYears(rapCov3, 'TRE');
+
+// combining all rap summaries into single fc
+var meanRAPfc = ee.FeatureCollection(meanAFGfc)
+  .merge(meanPFGfc)
+  .merge(meanSHRfc)
+  .merge(meanTREfc);
   
-  // this creates a dictionary, mean value of the image for each
-  // unique set of pixels (as defined by suidBin)
-  var meanDict = ee.Image(image).select(bandName, 'suidBin').reduceRegion({
-    reducer: ee.Reducer.mean().group({
-      groupField: 1,
-      groupName: 'suidBin',
-    }),
-    geometry: region,
-    scale: scale,
-    maxPixels: 1e12
-  });
-  
-  // return a list where each element is a feature
-  // that contains the mean cover value, name of the image band the mean is of
-  // the suidBin, and the year the image is from
-  var meanList = ee.List(meanDict.get('groups')).map(function (x) {
-    var f = ee.Feature(null, 
-      // using this code here to rename the parts as needed
-      {suidBin: ee.Number(ee.Dictionary(x).get('suidBin')).toInt64(),
-      // area in m^2
-        meanValue: ee.Dictionary(x).get('mean'),
-        bandName: bandName,
-        year: ee.Image(image).get('year')
-      });
-    return f;
-    });
-  
-  return meanList;
-};
-
-  
-
-
-
-var test = meanBySuidBin(rapCov3.first(), 'AFG');
-print('rap test', test);
-
-if (false) {
-// print(rapCov3);
-// the first band is the one that 
-var afgM1 = rapCov3.select('AFG', 'suidBin').reduceRegion({
-  reducer: ee.Reducer.mean().group({
-    groupField: 1,
-    groupName: 'suidBin',
-  }),
-  geometry: region,
-  scale: scale,
-  maxPixels: 1e12
-});
-
-if (testRun) {
-  print(afgM1);
+if(testRun) {
+  // var test = meanBySuidBin(rapCov3.first(), 'AFG');
+  // print('rap test', test);
+  print('meanPFG', meanPFGfc);
+  print('mean all RAP', meanRAPfc);
 }
 
-}
 
 /*
 
@@ -350,9 +374,20 @@ var date = '20220925'; // to be included in file names
 
 // area of each suidBin
 if (runExports) {
+
+  // area
   Export.table.toDrive({
     collection: areasFc,
     description: 'area-by-suidBin_' + date,
+    folder: 'newRR_metrics',
+    fileFormat: 'CSV'
+  });
+
+  
+  // RAP--summarized cover
+    Export.table.toDrive({
+    collection: meanRAPfc,
+    description: 'RAP_cover-by-suidBin-year_' + date,
     folder: 'newRR_metrics',
     fileFormat: 'CSV'
   });
