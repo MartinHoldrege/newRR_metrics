@@ -209,9 +209,30 @@ Map.addLayer(suidBin, {palette: ['Black']}, 'suidBin', false);
 
 /*
 
-summarizing by suid
+Area by suidBin
 
 */
+
+var areaImage = ee.Image.pixelArea().addBands(
+      suidBin);
+ 
+var areas = areaImage.reduceRegion({
+      reducer: ee.Reducer.sum().group({
+      groupField: 1,
+      groupName: 'suidBin',
+    }),
+    geometry: region,
+    scale: scale,
+    maxPixels: 1e12
+    }); 
+
+if(testRun) {
+  print('area')
+  print(ee.Algorithms.ObjectType(areas))
+  print(areas)
+}
+
+
 var rapCov3 = rapCov2.addBands(suidBin);
 
 // print(rapCov3);
