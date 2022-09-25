@@ -38,9 +38,10 @@ Next step--determine how much area for each suidBin code, and output this
 
 var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
 var scale = 30;
-var testRun = true; //is this just a test run--if so code run for a very small area
+var testRun = true; // false; // is this just a test run--if so code run for a very small area
 // the way the code is currently designed it will only work for up to 35 year period
 // (due to how the unique codes for each fire/year and suid combo are created)
+var runExports = false; // whether to export csv files
 var startYear = 1986;
 var endYear = 2020;
 
@@ -112,8 +113,11 @@ No Data value = 255
 
 var rapCov1 = ee.ImageCollection('projects/rangeland-analysis-platform/vegetation-cover-v3');
 
-var rapCov2 = rapCov1.filterDate('2019-01-01', '2020-12-31').mean(); // for testing purposes just taking mean of last couple years
+var rapCov2 = rapCov1
+  .filterDate(startYear + '-01-01', endYear + '-12-31')
+  .filterBounds(region);
 
+print(rapCov2)
 //print(rapCov2.bandNames())
 
 /*
@@ -203,7 +207,8 @@ var suidBin = suidLong
   // of years is longer than 35 (ie 2^35 would fit, but could would run into problems
   // if it were 36 years). 
   .add(cwfBinImageM)
-  .rename('suidBin');
+  .rename('suidBin')
+  .int64();
   
 Map.addLayer(suidBin, {palette: ['Black']}, 'suidBin', false);
 
@@ -211,6 +216,8 @@ Map.addLayer(suidBin, {palette: ['Black']}, 'suidBin', false);
 
 Area by suidBin
 
+Calculating the area of pixels falling in each combination of fire years and
+simulation id. 
 */
 
 var areaImage = ee.Image.pixelArea().addBands(
@@ -226,15 +233,95 @@ var areas = areaImage.reduceRegion({
     maxPixels: 1e12
     }); 
 
+
+// converting dictionary to a feature collection so that it can be output
+// to a csv
+
+// list where each component is a feature
+var areasList = ee.List(areas.get('groups')).map(function (x) {
+  return ee.Feature(null, 
+  // using this code here to rename the parts as needed
+  {suidBin: ee.Number(ee.Dictionary(x).get('suidBin')).toInt64(),
+  // area in m^2
+    area_m2: ee.Dictionary(x).get('sum')
+  });
+});
+
+var areasFc = ee.FeatureCollection(areasList);
+
+
 if(testRun) {
-  print('area')
-  print(ee.Algorithms.ObjectType(areas))
-  print(areas)
+  print('areas fc', areasFc);
 }
 
+/*
 
-var rapCov3 = rapCov2.addBands(suidBin);
+RAP cover by year and suidBin
 
+calculating the average cover each year, for each suidBin (i.e. the pixels)
+*/
+
+// mask of pixels that 1) burned at some point and 2) have and a simulation unit id
+var maskSuidBin = suidBin.unmask().neq(0); 
+// testing data validity
+
+var nYears = years.length().getInfo();
+var nImages = rapCov2.size().getInfo();
+
+if(nYears != nImages) {
+  throw new Error('Rap dataset and years vector not the same length');
+}
+
+var rapCov3 = rapCov2.map(function(x) {
+  return ee.Image(x).addBands(suidBin).mask(maskSuidBin);
+});
+
+print(rapCov3)
+
+
+
+
+var meanBySuidBin = function(image, bandName) {
+  // the first band is the one that taking an average of
+  
+  // this creates a dictionary, mean value of the image for each
+  // unique set of pixels (as defined by suidBin)
+  var meanDict = ee.Image(image).select(bandName, 'suidBin').reduceRegion({
+    reducer: ee.Reducer.mean().group({
+      groupField: 1,
+      groupName: 'suidBin',
+    }),
+    geometry: region,
+    scale: scale,
+    maxPixels: 1e12
+  });
+  
+  // return a list where each element is a feature
+  // that contains the mean cover value, name of the image band the mean is of
+  // the suidBin, and the year the image is from
+  var meanList = ee.List(meanDict.get('groups')).map(function (x) {
+    var f = ee.Feature(null, 
+      // using this code here to rename the parts as needed
+      {suidBin: ee.Number(ee.Dictionary(x).get('suidBin')).toInt64(),
+      // area in m^2
+        meanValue: ee.Dictionary(x).get('mean'),
+        bandName: bandName,
+        year: ee.Image(image).get('year')
+      });
+    return f;
+    });
+  
+  return meanList;
+};
+
+  
+
+
+
+var test = meanBySuidBin(rapCov3.first(), 'AFG');
+print('rap test', test);
+
+if (false) {
 // print(rapCov3);
 // the first band is the one that 
 var afgM1 = rapCov3.select('AFG', 'suidBin').reduceRegion({
@@ -250,6 +337,28 @@ var afgM1 = rapCov3.select('AFG', 'suidBin').reduceRegion({
 if (testRun) {
   print(afgM1);
 }
+
+}
+
+/*
+
+Save output
+
+*/
+
+var date = '20220925'; // to be included in file names
+
+// area of each suidBin
+if (runExports) {
+  Export.table.toDrive({
+    collection: areasFc,
+    description: 'area-by-suidBin_' + date,
+    folder: 'newRR_metrics',
+    fileFormat: 'CSV'
+  });
+}
+
+
 
 
 
