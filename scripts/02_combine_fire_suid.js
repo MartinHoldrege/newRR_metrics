@@ -261,8 +261,25 @@ var cwfBinImage = ee.ImageCollection(cwfBinImageByYear).sum();
 // all the layers were masked
 
 var maskFire = cwfBinImage.unmask().neq(0).rename('mask'); //1 for burned areas
-var cwfBinImageM = cwfBinImage.mask(maskFire).updateMask(mask);
+var cwfBinImageM = cwfBinImage.mask(maskFire).updateMask(mask).rename('bin');
 Map.addLayer(cwfBinImageM, {min:0, max: 10^12, palette: ['Black']}, 'fires all yrs', false);
+
+
+// get all the unique 'binary' fire-year codes
+//(https://gis.stackexchange.com/questions/403785/finding-all-unique-values-in-categorical-image)
+var reduction = cwfBinImageM.reduceRegion({
+  reducer: ee.Reducer.frequencyHistogram(), 
+  geometry: region,
+  scale: scale
+});
+
+var binUnique = ee.Dictionary(reduction.get(cwfBinImageM.bandNames().get(0)))
+    .keys()
+    .map(ee.Number.parse);
+    
+if(testRun) {
+  print('unique bin vals', binUnique);
+}
 
 /*
 
@@ -303,38 +320,53 @@ Calculating the area of pixels falling in each combination of fire years and
 simulation id. 
 */
 
-var areaImage = ee.Image.pixelArea().addBands(
-      suidBin);
+var areaImage = ee.Image.pixelArea()
  
-var areas = areaImage.reduceRegion({
+// looping through each unique bin, calculating the area of each suid
+// falling into that bin, creating feature that has properties including the bin, the suid, and the area
+// and next all these features are combined into one big feature collection
+// that should have all combinations of suid and bin. 
+var areas = binUnique.map(function(bin) {
+  var binImage = cwfBinImageM.eq(ee.Number(bin)).selfMask();
+  
+  var suidMasked = suid1.updateMask(binImage.unmask())
+  
+  var suidArea = areaImage.addBands(suid1);
+  
+  var reduced = suidArea.reduceRegion({
       reducer: ee.Reducer.sum().group({
       groupField: 1,
-      groupName: 'suidBin',
+      groupName: 'suid',
     }),
     geometry: region,
     scale: scale,
     maxPixels: 1e12
     }); 
+    
+    // list where each component is a feature
+  var areasList = ee.List(reduced.get('groups')).map(function (x) {
+    return ee.Feature(null, 
+      // using this code here to rename the parts as needed
+      {suid: ee.Number(ee.Dictionary(x).get('suid')),
+      // binary code of fire year
+      bin: ee.Number(bin),
+      // area in m^2
+      area_m2: ee.Dictionary(x).get('sum')
+    });
+  });
 
+  return ee.FeatureCollection(areasList);
+});
 
+var areasFc = ee.FeatureCollection(areas).flatten();
 // converting dictionary to a feature collection so that it can be output
 // to a csv
 
-// list where each component is a feature
-var areasList = ee.List(areas.get('groups')).map(function (x) {
-  return ee.Feature(null, 
-  // using this code here to rename the parts as needed
-  {suidBin: ee.Number(ee.Dictionary(x).get('suidBin')).toInt64(),
-  // area in m^2
-    area_m2: ee.Dictionary(x).get('sum')
-  });
-});
 
-var areasFc = ee.FeatureCollection(areasList);
 
 
 if(testRun) {
-  print('areas fc', areasFc);
+  print('areas', areasFc)
 }
 
 /*
@@ -394,7 +426,7 @@ Save output
 
 */
 
-var date = '20220925'; // to be included in file names
+var date = '20220926'; // to be included in file names
 
 if(testRun) {
   var date = 'testRun_' + date
