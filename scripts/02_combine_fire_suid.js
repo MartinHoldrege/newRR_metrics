@@ -212,18 +212,19 @@ var mapOverBins = function(dataImage, binList, bandName) {
 // bandName: string, name of the band to take means of 
 var mapOverYears = function(ic, binList, bandName) {
   
-  var fc = ic // image collection (i.e. rap cover)
-    // creating list so that the output of map doesn't have to be an image or feature
-    .toList(years.length()) 
-    // list of lists where each list element is a list for a given year
-    // of features giving mean cover for a given suid
-    .map(function(image) {
-      return mapOverBins(ee.Image(image), binList, bandName);
-    })
-    // flatten so that features from different years are in the same list
-    .flatten(); 
-  
-  return ee.FeatureCollection(fc);
+  // mapping over years not the ic because mapping over an ic
+  // requires the output to be a feature or an image
+  var fc = years.map(function(year){
+    var image = ic// image collection (i.e. rap cover)
+      .filter(ee.Filter.eq('year',year)).first()
+    
+    // of features providing mean cover for a given suid
+    var out = mapOverBins(ee.Image(image), binList, bandName);
+    
+    return out;
+  });
+
+  return ee.FeatureCollection(fc).flatten();
 };
 
 
