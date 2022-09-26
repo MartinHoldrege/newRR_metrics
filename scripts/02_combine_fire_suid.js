@@ -394,8 +394,8 @@ if (runExports) {
   
   // RAP--summarized cover
     Export.table.toDrive({
-    collection: meanRAPfc,
-    description: 'RAP_cover-by-suidBin-year_' + date,
+    collection: meanAFGfc,
+    description: 'RAP_AFG-by-suidBin-year_' + date,
     folder: 'newRR_metrics',
     fileFormat: 'CSV'
   });
