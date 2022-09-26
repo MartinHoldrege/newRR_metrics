@@ -40,10 +40,10 @@ fixed
 
 var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
 var scale = 30;
-var testRun = false; // false; // is this just a test run--if so code run for a very small area
+var testRun = true; // false; // is this just a test run--if so code run for a very small area
 // the way the code is currently designed it will only work for up to 35 year period
 // (due to how the unique codes for each fire/year and suid combo are created)
-var runExports = true; // whether to export csv files
+var runExports = false; // whether to export csv files
 var startYear = 1986;
 var endYear = 2020;
 
@@ -70,7 +70,7 @@ var suid1 = ee.Image(pathAsset + 'suid/gsu_masked_v20220314')
 
 Map.addLayer(suid1, {min: 0, max: 100000}, 'suid', false);
 
-var mask = suid1.unmask().neq(0);
+var mask = suid1.unmask().neq(0).rename('mask');
 Map.addLayer(mask, {min: 0, max: 1, palette: ['white', 'black']}, 'mask', false);
 // region of interest
 
@@ -78,11 +78,23 @@ var biome = ee.FeatureCollection("projects/gee-guest/assets/SEI/US_Sagebrush_Bio
 
 
 if (testRun) {
-  var region = /* color: #d63000 */ee.Geometry.Polygon(
+  /*
+  // This is the original 'test' geometry around logan
+  var region = ee.Geometry.Polygon(
         [[[-111.87737424895596, 41.756976770460874],
           [-111.87634428069424, 41.719573725767205],
           [-111.78811033294033, 41.716498534131],
           [-111.77197416350674, 41.754927852691175]]]);
+  */     
+  
+  // test geometry that includes 1986 fires (which are causing problems)
+  var region = 
+
+    ee.Geometry.Polygon(
+        [[[-112.57779075073331, 39.72923042941417],
+          [-112.57779075073331, 39.62353336440481],
+          [-112.41024924682706, 39.62353336440481],
+          [-112.41024924682706, 39.72923042941417]]], null, false);
 } else {
   var region = biome.geometry();
 }
@@ -177,7 +189,7 @@ var mapOverYears = function(ic, bandName) {
     // flatten so that features from different years are in the same list
     .flatten(); 
   
-  return fc;
+  return ee.FeatureCollection(fc);
 };
 
 
@@ -206,7 +218,7 @@ var cwfByYear = years.map(function(year) {
   return cwf1.filter(ee.Filter.eq('Fire_Yr', year));
 });
 
-Map.addLayer(ee.FeatureCollection(cwfByYear.get(1)), {}, '1986')
+Map.addLayer(ee.FeatureCollection(cwfByYear.get(0)), {}, '1986')
 
 // one image for each year 0 if unburned, 1 if burned
 var cwfImageByYear = cwfByYear
@@ -248,7 +260,7 @@ var cwfBinImage = ee.ImageCollection(cwfBinImageByYear).sum();
 // self mask here because summing acrros layers leads to 0s where
 // all the layers were masked
 
-var maskFire = cwfBinImage.unmask().neq(0); //1 for burned areas
+var maskFire = cwfBinImage.unmask().neq(0).rename('mask'); //1 for burned areas
 var cwfBinImageM = cwfBinImage.mask(maskFire).updateMask(mask);
 Map.addLayer(cwfBinImageM, {min:0, max: 10^12, palette: ['Black']}, 'fires all yrs', false);
 
@@ -264,11 +276,15 @@ var suidLong = suid1
   // have the same number of digits (so can later be extracted from a code)
   .add(ee.Number(100000).int64())
   .multiply(ee.Number(10).pow(11));
-  
+ 
+if(testRun) {
+  Map.addLayer(suidLong, {}, 'suid Long', false)
+} 
 // combined suid and cwf binary codes
 var suidBin = suidLong
   // updating mask so that only adding together areas that have an suid & that have burned
   .updateMask(maskFire)
+  .int64()
   // first 6 digits are by suid the remaning 11 are the the fire binary code.
   // b/ there are only 11 digits of space, this code will break down if the sequence
   // of years is longer than 35 (ie 2^35 would fit, but could would run into problems
@@ -368,7 +384,7 @@ if(testRun) {
   // var test = meanBySuidBin(rapCov3.first(), 'AFG');
   // print('rap test', test);
   print('meanPFG', meanPFGfc);
-  print('mean all RAP', meanRAPfc);
+  //print('mean all RAP', meanRAPfc);
 }
 
 
@@ -380,6 +396,10 @@ Save output
 
 var date = '20220925'; // to be included in file names
 
+if(testRun) {
+  var date = 'testRun_' + date
+  print(areasFc)
+}
 // area of each suidBin
 if (runExports) {
 
