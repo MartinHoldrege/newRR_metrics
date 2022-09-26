@@ -29,8 +29,10 @@ Then each combination of simulation unit and fire unit.
 Then get data for each of those. 
 
 
-Next step--determine how much area for each suidBin code, and output this
-(this will be an important table)
+Next step--some suidBins contain 0 bins when outputted--this suggests there
+is an issue with the workflow below (or unwanted rounding), either way it needs
+to be fixed (also no data from 1986 showing up?)--confirm if this has been 
+fixed
 */
 
 
@@ -38,9 +40,10 @@ Next step--determine how much area for each suidBin code, and output this
 
 var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
 var scale = 30;
-var testRun = true; //is this just a test run--if so code run for a very small area
+var testRun = false; // false; // is this just a test run--if so code run for a very small area
 // the way the code is currently designed it will only work for up to 35 year period
 // (due to how the unique codes for each fire/year and suid combo are created)
+var runExports = true; // whether to export csv files
 var startYear = 1986;
 var endYear = 2020;
 
@@ -112,9 +115,71 @@ No Data value = 255
 
 var rapCov1 = ee.ImageCollection('projects/rangeland-analysis-platform/vegetation-cover-v3');
 
-var rapCov2 = rapCov1.filterDate('2019-01-01', '2020-12-31').mean(); // for testing purposes just taking mean of last couple years
+var rapCov2 = rapCov1
+  .filterDate(startYear + '-01-01', endYear + '-12-31')
+  .filterBounds(region);
 
+//print(rapCov2)
 //print(rapCov2.bandNames())
+
+
+/*
+
+Functions
+
+some functions here rely on objects in the global environment (hence they can't be put in a seperate
+script and be sourced)
+*/
+
+var meanBySuidBin = function(image, bandName) {
+
+  // this creates a dictionary, mean value of the image for each
+  // unique set of pixels (as defined by suidBin)
+  var meanDict = ee.Image(image).select(bandName, 'suidBin').reduceRegion({
+    reducer: ee.Reducer.mean().group({
+      groupField: 1,
+      groupName: 'suidBin',
+    }),
+    geometry: region,
+    scale: scale,
+    maxPixels: 1e12
+  });
+  
+  // return a list where each element is a feature
+  // that contains the mean cover value, name of the image band the mean is of
+  // the suidBin, and the year the image is from
+  var meanList = ee.List(meanDict.get('groups')).map(function (x) {
+    var f = ee.Feature(null, 
+      // using this code here to rename the parts as needed
+      {suidBin: ee.Number(ee.Dictionary(x).get('suidBin')).toInt64(),
+      // area in m^2
+        meanValue: ee.Dictionary(x).get('mean'),
+        bandName: bandName,
+        year: ee.Image(image).get('year')
+      });
+    return f;
+    });
+  
+  return meanList;
+};
+
+// create feature collection where each feature is the mean cover for each year and suidbin
+var mapOverYears = function(ic, bandName) {
+  
+  var fc = ic // image collection (i.e. rap cover)
+    // creating list so that the output of map doesn't have to be an image or feature
+    .toList(years.length()) 
+    // list of lists where each list element is a list for a given year
+    // of features giving mean cover for a given suid
+    .map(function(image) {
+      return meanBySuidBin(image, bandName);
+    })
+    // flatten so that features from different years are in the same list
+    .flatten(); 
+  
+  return fc;
+};
+
 
 /*
 
@@ -141,6 +206,7 @@ var cwfByYear = years.map(function(year) {
   return cwf1.filter(ee.Filter.eq('Fire_Yr', year));
 });
 
+Map.addLayer(ee.FeatureCollection(cwfByYear.get(1)), {}, '1986')
 
 // one image for each year 0 if unburned, 1 if burned
 var cwfImageByYear = cwfByYear
@@ -154,6 +220,7 @@ var cwfImageByYear = cwfByYear
     return ee.Image(image).selfMask();
   });
 
+//print('test', ee.FeatureCollection(cwfByYear.get(1)).first());
 Map.addLayer(ee.Image(cwfImageByYear.get(0)), {min:0, max: 1, palette: ['white', 'black']}, 'fires, yr 1', false);
 
 // in the year 1 image areas that burned are 1 (2^0)
@@ -168,7 +235,8 @@ var cwfBinImageByYear = cwfImageByYear
     return out;
   });
   
-  
+
+//Map.addLayer(ee.Image(cwfBinImageByYear.get(0)), {palette: 'black'}, 'bin 1986') 
 // summing across years the pixels that burned.
 // this creates a code, where converting the code from
 // integer  to binary (base 2) will tell you what year(s) burned.
@@ -177,9 +245,12 @@ var cwfBinImageByYear = cwfImageByYear
 // years that didn't burn 
 var cwfBinImage = ee.ImageCollection(cwfBinImageByYear).sum();
 
-var cwfBinImageM = cwfBinImage.mask(mask);
-var maskFire = cwfBinImageM.unmask().neq(0); //1 for burned areas
-Map.addLayer(cwfBinImageM, {palette: ['Black']}, 'fires all yrs', false);
+// self mask here because summing acrros layers leads to 0s where
+// all the layers were masked
+
+var maskFire = cwfBinImage.unmask().neq(0); //1 for burned areas
+var cwfBinImageM = cwfBinImage.mask(maskFire).updateMask(mask);
+Map.addLayer(cwfBinImageM, {min:0, max: 10^12, palette: ['Black']}, 'fires all yrs', false);
 
 /*
 
@@ -203,32 +274,134 @@ var suidBin = suidLong
   // of years is longer than 35 (ie 2^35 would fit, but could would run into problems
   // if it were 36 years). 
   .add(cwfBinImageM)
-  .rename('suidBin');
+  .rename('suidBin')
+  .int64();
   
 Map.addLayer(suidBin, {palette: ['Black']}, 'suidBin', false);
 
 /*
 
-summarizing by suid
+Area by suidBin
 
+Calculating the area of pixels falling in each combination of fire years and
+simulation id. 
 */
-var rapCov3 = rapCov2.addBands(suidBin);
 
-// print(rapCov3);
-// the first band is the one that 
-var afgM1 = rapCov3.select('AFG', 'suidBin').reduceRegion({
-  reducer: ee.Reducer.mean().group({
-    groupField: 1,
-    groupName: 'suidBin',
-  }),
-  geometry: region,
-  scale: scale,
-  maxPixels: 1e12
+var areaImage = ee.Image.pixelArea().addBands(
+      suidBin);
+ 
+var areas = areaImage.reduceRegion({
+      reducer: ee.Reducer.sum().group({
+      groupField: 1,
+      groupName: 'suidBin',
+    }),
+    geometry: region,
+    scale: scale,
+    maxPixels: 1e12
+    }); 
+
+
+// converting dictionary to a feature collection so that it can be output
+// to a csv
+
+// list where each component is a feature
+var areasList = ee.List(areas.get('groups')).map(function (x) {
+  return ee.Feature(null, 
+  // using this code here to rename the parts as needed
+  {suidBin: ee.Number(ee.Dictionary(x).get('suidBin')).toInt64(),
+  // area in m^2
+    area_m2: ee.Dictionary(x).get('sum')
+  });
 });
 
-if (testRun) {
-  print(afgM1);
+var areasFc = ee.FeatureCollection(areasList);
+
+
+if(testRun) {
+  print('areas fc', areasFc);
 }
+
+/*
+
+RAP cover by year and suidBin
+
+calculating the average cover each year, for each suidBin (i.e. the pixels)
+*/
+
+// mask of pixels that 1) burned at some point and 2) have and a simulation unit id
+var maskSuidBin = suidBin.unmask().neq(0); 
+// testing data validity
+
+var nYears = years.length().getInfo();
+var nImages = rapCov2.size().getInfo();
+
+if(nYears != nImages) {
+  throw new Error('Rap dataset and years vector not the same length');
+}
+
+var rapCov3 = rapCov2.map(function(x) {
+  return ee.Image(x).addBands(suidBin).mask(maskSuidBin);
+});
+
+print(rapCov3);
+
+
+// annuals
+var meanAFGfc = mapOverYears(rapCov3, 'AFG');
+
+// perennials
+var meanPFGfc = mapOverYears(rapCov3, 'PFG');
+
+// shrubs
+var meanSHRfc = mapOverYears(rapCov3, 'SHR');
+
+// trees
+var meanTREfc = mapOverYears(rapCov3, 'TRE');
+
+// combining all rap summaries into single fc
+var meanRAPfc = ee.FeatureCollection(meanAFGfc)
+  .merge(meanPFGfc)
+  .merge(meanSHRfc)
+  .merge(meanTREfc);
+  
+if(testRun) {
+  // var test = meanBySuidBin(rapCov3.first(), 'AFG');
+  // print('rap test', test);
+  print('meanPFG', meanPFGfc);
+  print('mean all RAP', meanRAPfc);
+}
+
+
+/*
+
+Save output
+
+*/
+
+var date = '20220925'; // to be included in file names
+
+// area of each suidBin
+if (runExports) {
+
+  // area
+  Export.table.toDrive({
+    collection: areasFc,
+    description: 'area-by-suidBin_' + date,
+    folder: 'newRR_metrics',
+    fileFormat: 'CSV'
+  });
+
+  
+  // RAP--summarized cover
+    Export.table.toDrive({
+    collection: meanRAPfc,
+    description: 'RAP_cover-by-suidBin-year_' + date,
+    folder: 'newRR_metrics',
+    fileFormat: 'CSV'
+  });
+}
+
+
 
 
 
