@@ -29,8 +29,9 @@ Then each combination of simulation unit and fire unit.
 Then get data for each of those. 
 
 
-Next step--determine how much area for each suidBin code, and output this
-(this will be an important table)
+Next step--some suidBins contain 0 bins when outputted--this suggests there
+is an issue with the workflow below (or unwanted rounding), either way it needs
+to be fixed
 */
 
 
