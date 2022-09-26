@@ -31,7 +31,8 @@ Then get data for each of those.
 
 Next step--some suidBins contain 0 bins when outputted--this suggests there
 is an issue with the workflow below (or unwanted rounding), either way it needs
-to be fixed
+to be fixed (also no data from 1986 showing up?)--confirm if this has been 
+fixed
 */
 
 
@@ -118,7 +119,7 @@ var rapCov2 = rapCov1
   .filterDate(startYear + '-01-01', endYear + '-12-31')
   .filterBounds(region);
 
-print(rapCov2)
+//print(rapCov2)
 //print(rapCov2.bandNames())
 
 
@@ -205,6 +206,7 @@ var cwfByYear = years.map(function(year) {
   return cwf1.filter(ee.Filter.eq('Fire_Yr', year));
 });
 
+Map.addLayer(ee.FeatureCollection(cwfByYear.get(1)), {}, '1986')
 
 // one image for each year 0 if unburned, 1 if burned
 var cwfImageByYear = cwfByYear
@@ -218,6 +220,7 @@ var cwfImageByYear = cwfByYear
     return ee.Image(image).selfMask();
   });
 
+//print('test', ee.FeatureCollection(cwfByYear.get(1)).first());
 Map.addLayer(ee.Image(cwfImageByYear.get(0)), {min:0, max: 1, palette: ['white', 'black']}, 'fires, yr 1', false);
 
 // in the year 1 image areas that burned are 1 (2^0)
@@ -232,7 +235,8 @@ var cwfBinImageByYear = cwfImageByYear
     return out;
   });
   
-  
+
+//Map.addLayer(ee.Image(cwfBinImageByYear.get(0)), {palette: 'black'}, 'bin 1986') 
 // summing across years the pixels that burned.
 // this creates a code, where converting the code from
 // integer  to binary (base 2) will tell you what year(s) burned.
@@ -241,9 +245,12 @@ var cwfBinImageByYear = cwfImageByYear
 // years that didn't burn 
 var cwfBinImage = ee.ImageCollection(cwfBinImageByYear).sum();
 
-var cwfBinImageM = cwfBinImage.mask(mask);
-var maskFire = cwfBinImageM.unmask().neq(0); //1 for burned areas
-Map.addLayer(cwfBinImageM, {palette: ['Black']}, 'fires all yrs', false);
+// self mask here because summing acrros layers leads to 0s where
+// all the layers were masked
+
+var maskFire = cwfBinImage.unmask().neq(0); //1 for burned areas
+var cwfBinImageM = cwfBinImage.mask(maskFire).updateMask(mask);
+Map.addLayer(cwfBinImageM, {min:0, max: 10^12, palette: ['Black']}, 'fires all yrs', false);
 
 /*
 
