@@ -43,7 +43,7 @@ var scale = 30;
 var testRun = true; // false; // is this just a test run--if so code run for a very small area
 // the way the code is currently designed it will only work for up to 35 year period
 // (due to how the unique codes for each fire/year and suid combo are created)
-var runExports = false; // whether to export csv files
+var runExports = true; // whether to export csv files
 var startYear = 1986;
 var endYear = 2020;
 
@@ -143,14 +143,14 @@ some functions here rely on objects in the global environment (hence they can't 
 script and be sourced)
 */
 
-var meanBySuidBin = function(image, bandName) {
+var meanBySuidBin = function(image, bandName, bin) {
 
   // this creates a dictionary, mean value of the image for each
   // unique set of pixels (as defined by suidBin)
-  var meanDict = ee.Image(image).select(bandName, 'suidBin').reduceRegion({
+  var meanDict = ee.Image(image).select(bandName, 'suid').reduceRegion({
     reducer: ee.Reducer.mean().group({
       groupField: 1,
-      groupName: 'suidBin',
+      groupName: 'suid',
     }),
     geometry: region,
     scale: scale,
@@ -163,7 +163,8 @@ var meanBySuidBin = function(image, bandName) {
   var meanList = ee.List(meanDict.get('groups')).map(function (x) {
     var f = ee.Feature(null, 
       // using this code here to rename the parts as needed
-      {suidBin: ee.Number(ee.Dictionary(x).get('suidBin')).toInt64(),
+        {suid: ee.Number(ee.Dictionary(x).get('suid')),
+        bin: bin,
       // area in m^2
         meanValue: ee.Dictionary(x).get('mean'),
         bandName: bandName,
@@ -172,11 +173,44 @@ var meanBySuidBin = function(image, bandName) {
     return f;
     });
   
-  return meanList;
+  return ee.FeatureCollection(meanList);
 };
 
-// create feature collection where each feature is the mean cover for each year and suidbin
-var mapOverYears = function(ic, bandName) {
+// for a given image (i.e. data from a given year), get a feature collection
+// with one feature fore each suid and bin combination
+var mapOverBins = function(dataImage, binList, bandName) {
+  
+  // list of feature collections
+  var reducedList = binList.map(function(bin) {
+    
+    //masks out areas that don't have both the specific bin and an suid
+    var binMask = dataImage
+      .select('bin')
+      .unmask()
+      .eq(ee.Number(bin))
+      .and(dataImage.select('suid').unmask().neq(0));
+  
+    var dataImage2 = dataImage
+      // just the data band of interested and the identifier
+      .select([bandName, 'suid'])
+      // so reducer only applied to unmasked area
+      .mask(binMask);
+    
+    // feature collection giving avg data values of all suids for the given bin 
+    return meanBySuidBin(dataImage2, bandName, ee.Number(bin));
+  }); 
+  
+  var reducedFc = ee.FeatureCollection(reducedList).flatten();
+      
+  return reducedFc; 
+};
+  
+  
+// create feature collection where each feature is the mean cover for each year and suid and bin
+// ic: image collection (e.g. RAP)
+// binList: list of unique bin values (fire-year identifiers)
+// bandName: string, name of the band to take means of 
+var mapOverYears = function(ic, binList, bandName) {
   
   var fc = ic // image collection (i.e. rap cover)
     // creating list so that the output of map doesn't have to be an image or feature
@@ -184,7 +218,7 @@ var mapOverYears = function(ic, bandName) {
     // list of lists where each list element is a list for a given year
     // of features giving mean cover for a given suid
     .map(function(image) {
-      return meanBySuidBin(image, bandName);
+      return mapOverBins(ee.Image(image), binList, bandName);
     })
     // flatten so that features from different years are in the same list
     .flatten(); 
@@ -261,7 +295,11 @@ var cwfBinImage = ee.ImageCollection(cwfBinImageByYear).sum();
 // all the layers were masked
 
 var maskFire = cwfBinImage.unmask().neq(0).rename('mask'); //1 for burned areas
-var cwfBinImageM = cwfBinImage.mask(maskFire).updateMask(mask).rename('bin');
+var cwfBinImageM = cwfBinImage
+  .mask(maskFire)
+  .updateMask(mask)
+  .rename('bin');
+  
 Map.addLayer(cwfBinImageM, {min:0, max: 10^12, palette: ['Black']}, 'fires all yrs', false);
 
 
@@ -275,52 +313,23 @@ var reduction = cwfBinImageM.reduceRegion({
 
 var binUnique = ee.Dictionary(reduction.get(cwfBinImageM.bandNames().get(0)))
     .keys()
-    .map(ee.Number.parse);
+    .map(ee.Number.parse)
+    .sort();
     
 if(testRun) {
   print('unique bin vals', binUnique);
 }
 
-/*
-
-Combine fire data and suid
-
-*/
-
-
-var suidLong = suid1
-  // original suid's go from ~1 to ~100k, now add 100k, so that all id's
-  // have the same number of digits (so can later be extracted from a code)
-  .add(ee.Number(100000).int64())
-  .multiply(ee.Number(10).pow(11));
- 
-if(testRun) {
-  Map.addLayer(suidLong, {}, 'suid Long', false)
-} 
-// combined suid and cwf binary codes
-var suidBin = suidLong
-  // updating mask so that only adding together areas that have an suid & that have burned
-  .updateMask(maskFire)
-  .int64()
-  // first 6 digits are by suid the remaning 11 are the the fire binary code.
-  // b/ there are only 11 digits of space, this code will break down if the sequence
-  // of years is longer than 35 (ie 2^35 would fit, but could would run into problems
-  // if it were 36 years). 
-  .add(cwfBinImageM)
-  .rename('suidBin')
-  .int64();
-  
-Map.addLayer(suidBin, {palette: ['Black']}, 'suidBin', false);
 
 /*
 
-Area by suidBin
+Area by suid bin
 
 Calculating the area of pixels falling in each combination of fire years and
 simulation id. 
 */
 
-var areaImage = ee.Image.pixelArea()
+var areaImage = ee.Image.pixelArea();
  
 // looping through each unique bin, calculating the area of each suid
 // falling into that bin, creating feature that has properties including the bin, the suid, and the area
@@ -329,7 +338,7 @@ var areaImage = ee.Image.pixelArea()
 var areas = binUnique.map(function(bin) {
   var binImage = cwfBinImageM.eq(ee.Number(bin)).selfMask();
   
-  var suidMasked = suid1.updateMask(binImage.unmask())
+  var suidMasked = suid1.updateMask(binImage.unmask());
   
   var suidArea = areaImage.addBands(suid1);
   
@@ -363,21 +372,18 @@ var areasFc = ee.FeatureCollection(areas).flatten();
 // to a csv
 
 
-
-
 if(testRun) {
-  print('areas', areasFc)
+  print('areas', areasFc);
 }
 
 /*
 
-RAP cover by year and suidBin
+RAP cover by year and suid and bin
 
 calculating the average cover each year, for each suidBin (i.e. the pixels)
 */
 
-// mask of pixels that 1) burned at some point and 2) have and a simulation unit id
-var maskSuidBin = suidBin.unmask().neq(0); 
+
 // testing data validity
 
 var nYears = years.length().getInfo();
@@ -387,36 +393,32 @@ if(nYears != nImages) {
   throw new Error('Rap dataset and years vector not the same length');
 }
 
+// combine datasets
 var rapCov3 = rapCov2.map(function(x) {
-  return ee.Image(x).addBands(suidBin).mask(maskSuidBin);
+  // and suid and bin id. 
+  return ee.Image(x).addBands(suid1).addBands(cwfBinImageM);
 });
 
 print(rapCov3);
 
 
 // annuals
-var meanAFGfc = mapOverYears(rapCov3, 'AFG');
+var meanAFGfc = mapOverYears(rapCov3, binUnique, 'AFG');
 
 // perennials
-var meanPFGfc = mapOverYears(rapCov3, 'PFG');
+var meanPFGfc = mapOverYears(rapCov3, binUnique, 'PFG');
 
 // shrubs
-var meanSHRfc = mapOverYears(rapCov3, 'SHR');
+var meanSHRfc = mapOverYears(rapCov3, binUnique, 'SHR');
 
 // trees
-var meanTREfc = mapOverYears(rapCov3, 'TRE');
+var meanTREfc = mapOverYears(rapCov3, binUnique, 'TRE');
 
-// combining all rap summaries into single fc
-var meanRAPfc = ee.FeatureCollection(meanAFGfc)
-  .merge(meanPFGfc)
-  .merge(meanSHRfc)
-  .merge(meanTREfc);
-  
+
 if(testRun) {
   // var test = meanBySuidBin(rapCov3.first(), 'AFG');
   // print('rap test', test);
-  print('meanPFG', meanPFGfc);
-  //print('mean all RAP', meanRAPfc);
+  print('mean AFG', meanAFGfc);
 }
 
 
