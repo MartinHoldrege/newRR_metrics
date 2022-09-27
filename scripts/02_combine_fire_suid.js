@@ -323,6 +323,28 @@ if(testRun) {
 }
 
 print('length', binUnique.length())
+print(binUnique)
+
+// creating a new 'binSimple' which is a smaller number based on the
+// actual number of unique bins
+var binSimple = ee.List.sequence(ee.Number(1), binUnique.length())
+  .map(function(x){
+    return ee.Number(x).toInt64();
+  });
+
+var binSimpleImageM = cwfBinImageM.int64().remap(binUnique, binSimple);
+print('binSimpleImage', binSimpleImageM)
+var test = ee.Dictionary(binSimpleImageM.reduceRegion({
+    reducer: ee.Reducer.frequencyHistogram(), 
+    geometry: region,
+    scale: scale,
+    maxPixels: 1e11
+  }).get('remapped'))
+    .keys()
+    .map(ee.Number.parse)
+    .sort();
+    
+print('test', test)
 /*
 
 Area by suid and bin
