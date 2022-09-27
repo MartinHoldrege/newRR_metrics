@@ -40,10 +40,10 @@ fixed
 
 var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
 var scale = 30;
-var testRun = true; // false; // is this just a test run--if so code run for a very small area
+var testRun = false; // false; // is this just a test run--if so code run for a very small area
 // the way the code is currently designed it will only work for up to 35 year period
 // (due to how the unique codes for each fire/year and suid combo are created)
-var runExports = true; // whether to export csv files
+var runExports = false; // whether to export csv files
 var startYear = 1986;
 var endYear = 2020;
 
@@ -309,7 +309,8 @@ Map.addLayer(cwfBinImageM, {min:0, max: 10^12, palette: ['Black']}, 'fires all y
 var reduction = cwfBinImageM.reduceRegion({
   reducer: ee.Reducer.frequencyHistogram(), 
   geometry: region,
-  scale: scale
+  scale: scale,
+  maxPixels: 1e11
 });
 
 var binUnique = ee.Dictionary(reduction.get(cwfBinImageM.bandNames().get(0)))
@@ -321,10 +322,10 @@ if(testRun) {
   print('unique bin vals', binUnique);
 }
 
-
+print('length', binUnique.length())
 /*
 
-Area by suid bin
+Area by suid and bin
 
 Calculating the area of pixels falling in each combination of fire years and
 simulation id. 
