@@ -36,9 +36,6 @@ load the data
 
 var suid1 = ee.Image(pathAsset + 'suid/gsu_masked_v20220314')
   .rename('suid')
-  .toInt64(); // 64bit b/ later create very long numeric codes. 
-
-Map.addLayer(suid1, {min: 0, max: 100000}, 'suid', false);
 
 var mask = suid1.unmask().neq(0).rename('mask');
 Map.addLayer(mask, {min: 0, max: 1, palette: ['white', 'black']}, 'mask', false);
@@ -172,7 +169,12 @@ var binKey = binUnique.zip(binSimple)
 
 var binKeyFc = ee.FeatureCollection(binKey);
 
+/*
 
+Save output
+
+
+*/
 
 
 
