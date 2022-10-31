@@ -23,7 +23,7 @@ var endYear = 2020;
 var testRun = false; // is this just a test run?
 var runExports = true; //export assets?
 // dependencies
-var crs = 'EPSG:4326' // output set to WGS84, decimal degrees
+var crs = 'EPSG:4326'; // output set to WGS84, decimal degrees
 var fnsC = require("users/mholdrege/cheatgrass_fire:src/ee_functions.js");
 
 /***************************
