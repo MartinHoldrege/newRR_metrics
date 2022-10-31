@@ -20,7 +20,11 @@ var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
 var scale = 30;
 var startYear = 1986;
 var endYear = 2020;
-
+var testRun = false; // is this just a test run?
+var runExports = true; //export assets?
+// dependencies
+var crs = 'EPSG:4326' // output set to WGS84, decimal degrees
+var fnsC = require("users/mholdrege/cheatgrass_fire:src/ee_functions.js");
 
 /***************************
 
@@ -35,7 +39,7 @@ load the data
 // here just using this layer for masking
 
 var suid1 = ee.Image(pathAsset + 'suid/gsu_masked_v20220314')
-  .rename('suid')
+  .rename('suid');
 
 var mask = suid1.unmask().neq(0).rename('mask');
 Map.addLayer(mask, {min: 0, max: 1, palette: ['white', 'black']}, 'mask', false);
@@ -43,7 +47,18 @@ Map.addLayer(mask, {min: 0, max: 1, palette: ['white', 'black']}, 'mask', false)
 
 var biome = ee.FeatureCollection("projects/gee-guest/assets/SEI/US_Sagebrush_Biome_2019"); // provided by DT
 
-var region = biome.geometry();
+
+if (testRun) {
+  var region = 
+    ee.Geometry.Polygon(
+        [[[-112.57779075073331, 39.72923042941417],
+          [-112.57779075073331, 39.62353336440481],
+          [-112.41024924682706, 39.62353336440481],
+          [-112.41024924682706, 39.72923042941417]]], null, false);
+} else {
+  var region = biome.geometry();
+}
+
 
 // fire polygons
 // combined wildland fire dataset (from USGS--combines 40 different data sources)
@@ -144,17 +159,20 @@ var binUnique = ee.Dictionary(reduction.get(cwfBinImageM.bandNames().get(0)))
     
 if(testRun) {
   print('unique bin vals', binUnique);
+  print('length', binUnique.length());
+  print(binUnique);
 }
 
-print('length', binUnique.length());
-print(binUnique);
+
 
 // creating a new 'binSimple' which is a smaller number based on the
 // actual number of unique bins
-var binSimple = ee.List.sequence(ee.Number(1), binUnique.length())
+var binSimple = ee.List.sequence(ee.Number(1), binUnique.length());
 
-var binSimpleImageM = cwfBinImageM.int64().remap(binUnique, binSimple);
-
+var binSimpleImageM = cwfBinImageM
+  .remap(binUnique, binSimple)
+  .rename('binSimple')
+  .int32(); // binSimple values aren't as large so int32 should suffice and save space
 
 // create key of bin (ie the actual binary code) and binSimple
 var binKey = binUnique.zip(binSimple)
@@ -165,7 +183,7 @@ var binKey = binUnique.zip(binSimple)
         binSimple: ee.List(x).get(1)
       });
     return f;
-  })
+  });
 
 var binKeyFc = ee.FeatureCollection(binKey);
 
@@ -173,11 +191,38 @@ var binKeyFc = ee.FeatureCollection(binKey);
 
 Save output
 
-
 */
 
+var date = "20221031";
 
+if(testRun) {
+  var date = 'testRun' + date;
+}
 
+var s = '_' + startYear + '_' + endYear + '_' + scale + 'm_' + date;
 
+if(runExports) {
+  
+// key of binary fire code (i.e. so can determine which years actually burned)
+// and the simple (lower value )
+Export.table.toDrive({
+  collection: binKeyFc,
+  description: 'key_binary-fire-code_simple' + s,
+  folder: 'newRR_metrics',
+  fileFormat: 'CSV'
+});
+
+// here the 'm' in the file name stands for masked
+Export.image.toAsset({ 
+  image: binSimpleImageM, 
+  assetId: pathAsset + 'fire/cwf_binSimpleM' + s ,
+  description: 'cwf_binSimpleM' + s ,
+  maxPixels: 1e13, 
+  scale: scale, 
+  region: region,
+  crs: crs
+});
+
+}
 
 
