@@ -40,10 +40,10 @@ fixed--this was an issue with lack of precision of large numbers
 
 var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
 var scale = 30;
-var testRun = true; // false; // is this just a test run--if so code run for a very small area
+var testRun = false; // false; // is this just a test run--if so code run for a very small area
 // the way the code is currently designed it will only work for up to 35 year period
 // (due to how the unique codes for each fire/year and suid combo are created)
-var runExports = false; // whether to export csv files
+var runExports = true; // whether to export csv files
 var startYear = 1986;
 var endYear = 2020;
 
@@ -136,11 +136,11 @@ some functions here rely on objects in the global environment (hence they can't 
 script and be sourced)
 */
 
-var meanBySuidBin = function(image, bandName, bin) {
+var meanBySuidBin = function(image, bandName) {
 
   // this creates a dictionary, mean value of the image for each
   // unique set of pixels (as defined by suidBin)
-  var meanDict = ee.Image(image).select(bandName, 'suid').reduceRegion({
+  var meanDict = ee.Image(image).select(bandName, 'suidBinSimple').reduceRegion({
     reducer: ee.Reducer.mean().group({
       groupField: 1,
       groupName: 'suidBinSimple',
@@ -156,8 +156,7 @@ var meanBySuidBin = function(image, bandName, bin) {
   var meanList = ee.List(meanDict.get('groups')).map(function (x) {
     var f = ee.Feature(null, 
       // using this code here to rename the parts as needed
-        {suid: ee.Number(ee.Dictionary(x).get('suidBinSimple')),
-        bin: bin,
+        {suidBinSimple: ee.Number(ee.Dictionary(x).get('suidBinSimple')).toInt64(),
       // area in m^2
         meanValue: ee.Dictionary(x).get('mean'),
         bandName: bandName,
@@ -197,7 +196,7 @@ Prepare fire data for summarizing
 
 */
 
-
+var years = ee.List.sequence(startYear, endYear);
 Map.addLayer(binSimpleImageM, {min:0, max: 10^5, palette: ['Black']}, 'fires all yrs', false);
 
 
@@ -210,7 +209,8 @@ combine suid and bin
 var suidLong = suid1
   // original suid's go from ~1 to ~100k, now add 100k, so that all id's
   // have the same number of digits (so can later be extracted from a code)
-  .add(ee.Number(100000).int64())
+  .add(ee.Number(100000))
+  .toDouble() // so that no digits are lost (ie enough precision)
   // adding lagging zeroes so can add to bin simple
   .multiply(ee.Number(10).pow(5));
  
@@ -221,14 +221,12 @@ if(testRun) {
 var maskFire = binSimpleImageM.gte(1);
 
 // combined suid and cwf binary codes
-var suidBin = suidLong
+var suidBinSimple = suidLong
   // updating mask so that only adding together areas that have an suid & that have burned
   .updateMask(maskFire)
   // first 6 digits are by suid the remaning 5 are the the simple fire binary code.
-  .add(binSimpleImageM)
-  .rename('suidBinSimple')
-  .int64();
-
+  .add(binSimpleImageM.toDouble())
+  .rename('suidBinSimple');
 
 /*
 
@@ -244,8 +242,8 @@ Calculating the area of pixels falling in each combination of fire years and
 simulation id. 
 */
 
-var areaImage = ee.Image.pixelArea().addBands(
-      suidBin);
+var areaImage = ee.Image.pixelArea()
+  .addBands(suidBinSimple);
  
 var areas = areaImage.reduceRegion({
       reducer: ee.Reducer.sum().group({
@@ -287,7 +285,7 @@ calculating the average cover each year, for each suidBin (i.e. the pixels)
 */
 
 
-var maskSuidBin = suidBinSimple.gte(0).unmask(); 
+var maskSuidBinSimple = suidBinSimple.gte(0).unmask(); 
 
 // testing data validity
 
@@ -327,16 +325,19 @@ Save output
 var date = '20220926'; // to be included in file names
 
 if(testRun) {
-  var date = 'testRun_' + date
-  print(areasFc)
+  var date = 'testRun' + date;
+  print(areasFc);
+  print('meanAFGfc', meanAFGfc);
 }
+
+var s = '_' + startYear + '_' + endYear + '_' + scale + 'm_' + date;
 // area of each suidBin
 if (runExports) {
 
   // area
   Export.table.toDrive({
     collection: areasFc,
-    description: 'area-by-suidBin_' + date,
+    description: 'area-by-suidBinSimple' + s,
     folder: 'newRR_metrics',
     fileFormat: 'CSV'
   });
@@ -345,7 +346,7 @@ if (runExports) {
   // RAP--summarized cover
     Export.table.toDrive({
     collection: meanAFGfc,
-    description: 'RAP_AFG-by-suidBin-year_' + date,
+    description: 'RAP_AFG-by-suidBinSimple-year' + s,
     folder: 'newRR_metrics',
     fileFormat: 'CSV'
   });
