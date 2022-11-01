@@ -322,7 +322,7 @@ Save output
 
 */
 
-var date = '20220926'; // to be included in file names
+var date = '20221031'; // to be included in file names
 
 if(testRun) {
   var date = 'testRun' + date;
