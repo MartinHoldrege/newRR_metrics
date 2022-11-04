@@ -16,7 +16,7 @@ Also output the amount of area belonging to each suidBinSimple
 
 var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
 var scale = 30;
-var testRun = true; // false; // is this just a test run--if so code run for a very small area
+var testRun = false; // false; // is this just a test run--if so code run for a very small area
 var runExports = true; // whether to export csv files
 var startYear = 1986;
 var endYear = 2020;
@@ -76,7 +76,7 @@ Map.addLayer(region, {}, 'roi', false);
 // note that this image doesn't actually contain the binary code, but a shorter
 // number, the key to lookup what the associated binary code is can be found
 // in a table outputed by that same script
-var binSimpleImageM = ee.Image(pathAsset + 'fire/cwf_binSimpleM_1986_2020_30m_20221031')
+var binSimpleImageM = ee.Image(pathAsset + 'fire/cwf_binSimpleM_1986_2020_30m_20221104')
 
 // rap cover data
 
