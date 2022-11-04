@@ -22,7 +22,10 @@ var startYear = 1986;
 var endYear = 2020;
 var testRun = false; // is this just a test run?
 var runExports = true; //export assets?
+var date = "20221104"; // for appending to output names
+
 // dependencies
+
 var crs = 'EPSG:4326'; // output set to WGS84, decimal degrees
 var fnsC = require("users/mholdrege/cheatgrass_fire:src/ee_functions.js");
 
@@ -102,8 +105,7 @@ var cwfImageByYear = cwfByYear
   .zip(years) // combine two lists into one (each element of list is a list w/ 2 elements)
   .map(fnsC.setTimeStart) //
   .map(function(image) {
-    // unburned areas are masked
-    return ee.Image(image).selfMask();
+    return ee.Image(image);
   });
 
 //print('test', ee.FeatureCollection(cwfByYear.get(1)).first());
@@ -134,14 +136,13 @@ var cwfBinImage = ee.ImageCollection(cwfBinImageByYear).sum();
 // self mask here because summing acrros layers leads to 0s where
 // all the layers were masked
 
-var maskFire = cwfBinImage.unmask().neq(0).rename('mask'); //1 for burned areas
 var cwfBinImageM = cwfBinImage
-  .mask(maskFire)
-  .updateMask(mask)
+  .unmask() // unburned areas become 0
+  .mask(mask) // only including areas that have suid
   .rename('bin');
   
-Map.addLayer(cwfBinImageM, {min:0, max: 10^12, palette: ['Black']}, 'fires all yrs', false);
-
+Map.addLayer(cwfBinImageM.gt(0).selfMask(), {palette: ['Red']}, 'burned areas', false);
+Map.addLayer(cwfBinImageM.eq(0).selfMask(), {palette: ['White']}, 'un burned areas', false);
 
 // get all the unique 'binary' fire-year codes
 //(https://gis.stackexchange.com/questions/403785/finding-all-unique-values-in-categorical-image)
@@ -164,10 +165,10 @@ if(testRun) {
 }
 
 
-
 // creating a new 'binSimple' which is a smaller number based on the
-// actual number of unique bins
-var binSimple = ee.List.sequence(ee.Number(1), binUnique.length());
+// actual number of unique bins. bin of 0 means nothing burned, and this
+// should also be represented by a binSimple 'key' of 0. 
+var binSimple = ee.List.sequence(ee.Number(0), ee.Number(binUnique.length()).subtract(1));
 
 var binSimpleImageM = cwfBinImageM
   .remap(binUnique, binSimple)
@@ -193,7 +194,7 @@ Save output
 
 */
 
-var date = "20221031";
+
 
 if(testRun) {
   var date = 'testRun' + date;
@@ -212,7 +213,8 @@ Export.table.toDrive({
   fileFormat: 'CSV'
 });
 
-// here the 'm' in the file name stands for masked
+// here the 'm' in the file name stands for masked--i.e. areas for which suid not 
+// available are masked out
 Export.image.toAsset({ 
   image: binSimpleImageM, 
   assetId: pathAsset + 'fire/cwf_binSimpleM' + s ,
