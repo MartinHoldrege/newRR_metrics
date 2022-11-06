@@ -20,24 +20,17 @@ source("../SEI/src/general_functions.R")
 files1 <- drive_ls(path = "newRR_metrics")
 files1
 
-# download  ---------------------------------------------------------------
-
-files2 <- files1 %>% 
-  mutate(modifiedTime = map_chr(drive_resource, function(x) x$modifiedTime)) %>% 
-  # if multiple files with the same
-  # name only download the newer one
-  group_by(name) %>% 
-  filter(modifiedTime == max(modifiedTime))
-
-
 # select most recent date -------------------------------------------------
 # sometimes multiple files are loaded to gdrive over time,
 # and the date is appended to the file names, I only want the
 # one with the most recent date
 
 files2 <- files1 %>% 
-  mutate(name_no_date = str_replace(name, "20\\d{6}\\.", ""),
-         date = str_extract(name, "20\\d{6}\\."),
+  # name no date removes the date and everything after the 
+  # date (b/ multi tile tifs have coordinates after that
+  # and they belong to the same original image)
+  mutate(name_no_date = str_replace(name, "202\\d{5}.+", ""),
+         date = str_extract(name, "202\\d{5}"),
          date = lubridate::ymd(date),
          modifiedTime = map_chr(drive_resource, function(x) x$modifiedTime)) %>% 
   # if multiple files with the same
@@ -75,4 +68,11 @@ files2 %>%
   filter(str_detect(name, '^key.*\\.csv$')) %>% 
   drive_download_from_df(., folder_path = "data_processed/key")
 
-                 
+
+# id rasters --------------------------------------------------------------
+
+# raster of grouping ids
+
+files2 %>% 
+  filter(str_detect(name, "suidBinSimple_.*tif")) %>% 
+  drive_download_from_df(folder_path = "data_processed/id_raster")
