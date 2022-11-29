@@ -1,38 +1,14 @@
 /*
 Script started 9/8/2022 by Martin Holdrege
 
-Purpose--summarise landcover datasets by a classification raster (i.e. each pixel
-belongs to one of ~100k unique soil units)
+Purpose--summarise landcover datasets by a classification raster 
 
+Details:
+for each combination of suid (RR simulation unit ids from daniel) and specific years
+burned (denoted by the suidBinSimple id), calculate the mean cover for RAP layers for each
+year in the time period. 
 
-*/
-
-
-/*
-Some notes (9/19/2022)
-
-1979---2020 (is the range they're simulating for)
-
-each year avg cover, for each year*identifier
-
-seperate dataframe
-% burned of that identifier for that year. 
-
-seperate dataset--just looking at fires
-for each combination of simulation unit and fire get
-the average cover for that polygon for each year. also
-year for each fire id, and area of each polygon. 
-
-first create new fire polygon layer which is each unique combination of fires.
-
-Then each combination of simulation unit and fire unit. 
-Then get data for each of those. 
-
-
-Next step--some suidBins contain 0 bins when outputted--this suggests there
-is an issue with the workflow below (or unwanted rounding), either way it needs
-to be fixed (also no data from 1986 showing up?)--confirm if this has been 
-fixed--this was an issue with lack of precision of large numbers
+Also output the amount of area belonging to each suidBinSimple
 */
 
 
@@ -41,11 +17,11 @@ fixed--this was an issue with lack of precision of large numbers
 var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
 var scale = 30;
 var testRun = false; // false; // is this just a test run--if so code run for a very small area
-// the way the code is currently designed it will only work for up to 35 year period
-// (due to how the unique codes for each fire/year and suid combo are created)
 var runExports = true; // whether to export csv files
 var startYear = 1986;
 var endYear = 2020;
+var date = '20221104'; // to be included output in file names
+var crs = 'EPSG:5070'; // projection for output rasters
 
 // dependencies
 
@@ -100,7 +76,7 @@ Map.addLayer(region, {}, 'roi', false);
 // note that this image doesn't actually contain the binary code, but a shorter
 // number, the key to lookup what the associated binary code is can be found
 // in a table outputed by that same script
-var binSimpleImageM = ee.Image(pathAsset + 'fire/cwf_binSimpleM_1986_2020_30m_20221031')
+var binSimpleImageM = ee.Image(pathAsset + 'fire/cwf_binSimpleM_1986_2020_30m_20221104')
 
 // rap cover data
 
@@ -218,12 +194,9 @@ if(testRun) {
   Map.addLayer(suidLong, {}, 'suid Long', false);
 } 
 
-var maskFire = binSimpleImageM.gte(1);
 
 // combined suid and cwf binary codes
 var suidBinSimple = suidLong
-  // updating mask so that only adding together areas that have an suid & that have burned
-  .updateMask(maskFire)
   // first 6 digits are by suid the remaning 5 are the the simple fire binary code.
   .add(binSimpleImageM.toDouble())
   .rename('suidBinSimple');
@@ -315,26 +288,45 @@ var meanSHRfc = mapOverYears(rapCov3, 'SHR');
 // trees
 var meanTREfc = mapOverYears(rapCov3, 'TRE');
 
-
+// objects to output
+var rapOut = [
+  ['AFG', meanAFGfc],
+  ['PFG', meanPFGfc],
+  ['SHR', meanSHRfc],
+  ['TRE', meanTREfc]
+  ];
 /*
 
 Save output
 
 */
 
-var date = '20221031'; // to be included in file names
 
 if(testRun) {
   var date = 'testRun' + date;
+  
   print(areasFc);
   print('meanAFGfc', meanAFGfc);
 }
 
 var s = '_' + startYear + '_' + endYear + '_' + scale + 'm_' + date;
+
 // area of each suidBin
 if (runExports) {
-
-  // area
+  
+  // suidBinSimple raster
+  Export.image.toDrive({
+    image: suidBinSimple,
+    description: 'suidBinSimple' + s,
+    folder: 'newRR_metrics',
+    maxPixels: 1e13, 
+    scale: scale,
+    region: region,
+    crs: crs,
+    fileFormat: 'GeoTIFF'
+  });
+    
+    // area
   Export.table.toDrive({
     collection: areasFc,
     description: 'area-by-suidBinSimple' + s,
@@ -342,14 +334,16 @@ if (runExports) {
     fileFormat: 'CSV'
   });
 
-  
   // RAP--summarized cover
+  // looping through functional types
+  for (var i=0; i < rapOut.length; i++) {
     Export.table.toDrive({
-    collection: meanAFGfc,
-    description: 'RAP_AFG-by-suidBinSimple-year' + s,
-    folder: 'newRR_metrics',
-    fileFormat: 'CSV'
-  });
+      collection: rapOut[i][1],
+      description: 'RAP_' + rapOut[i][0] + '-by-suidBinSimple-year' + s,
+      folder: 'newRR_metrics',
+      fileFormat: 'CSV'
+    });
+  }
 }
 
 
