@@ -23,11 +23,11 @@ var endYear = 2020;
 var testRun = true; // is this just a test run?
 var runExports = true; //export assets?
 var date = "20221129"; // for appending to output names
+var crs = 'EPSG:5070';
 
 // dependencies
 
-var crs = 'EPSG:5070';
-var fnsC = require("users/mholdrege/cheatgrass_fire:src/ee_functions.js");
+var fns = require("users/mholdrege/newRR_metrics:src/functions.js");
 
 /***************************
 
@@ -87,7 +87,11 @@ var mtbs2 = mtbs1.map(function(x) {
   return out;
 });
 
-// create binImage where each pixel is a code telling which years burned
+/*
+
+create binImage where each pixel is a code telling which years burned
+
+*/
 
 // create list of years
 var years = ee.List.sequence(startYear, endYear);
@@ -98,8 +102,7 @@ var mtbsImageByYear = mtbs2.map(function(x) {
   // pixels that are within fire perimeters (i.e. not background or
   // non-mapping, are changed to), are change to 1, otherwise 0
     .remap([0, 1, 2, 3, 4, 5, 6], [0, 1, 1, 1, 1, 1, 0])
-    .rename('fire')
-    .toDouble();
+    .rename('fire');
   return out;
 });
 
@@ -112,7 +115,9 @@ var mtbsBinImageByYear = mtbsImageByYear.map(function(x) {
   var yearCount = ee.Number(image.get('year'))
     .subtract(ee.Number(startYear));
   var multiplier = ee.Number(2).pow(yearCount);
-  var out = image.multiply(multiplier);
+  var out = image
+    .toDouble()
+    .multiply(multiplier);
   return out; 
 });
 
@@ -178,10 +183,14 @@ if (testRun) {
   print('binkey', binKeyFc);
 }
 
+/*
 
-// for each bin (or equivelantly bin simple), determine the burn severity sequence
-// eventually want to seperate pixels that say burned in say both 2000 and 2010 and
-// with burn severities of 2 and 3 vs 2 and 4 respectively. 
+for each bin (or equivelantly bin simple), determine the burn severity sequence
+eventually want to seperate pixels that say burned in say both 2000 and 2010 and
+with burn severities of 2 and 3 vs 2 and 4 respectively. 
+
+*/
+
 
 var mtbs3= mtbs2.map(function(x) {
   var out = ee.Image(x)
@@ -191,6 +200,73 @@ var mtbs3= mtbs2.map(function(x) {
   return out;
 });
 
+
+// if a given pixel burned burned that year, shows if this is the 1st, 2nd, 3rd etc. fire
+var fireNum = years.map(function(yr) {
+
+  var filteredCollection = mtbsImageByYear
+    .filter(ee.Filter.lte('year', ee.Number(yr)));
+    
+  // image showing whether burned in current year
+  var currentYear = ee.Image(mtbsImageByYear
+    .filter(ee.Filter.eq('year', ee.Number(yr)))
+    .first())
+    .unmask();
+    
+  // cumulative number of fires that have occurred
+  var cumulative = ee.Image(filteredCollection.sum());
+  
+  // if it burned that year, shows if this is the 1st, 2nd, 3rd etc. fire
+  // for that pixel
+  var out = cumulative
+    .updateMask(currentYear)
+    .rename('fireNum')
+    // system properties needed so that image collections can be combined below
+    .copyProperties(currentYear, ['year', 'system:index', 'system:time_start']);
+
+  return out;
+});
+
+var fireNum = ee.ImageCollection(fireNum);
+
+// combine band of severity with band showing the fire number (1st, 2nd, 3rd, etc.)
+var mtbs4 = mtbs3.combine(fireNum);
+
+// total number of times each pixel burned
+var totalFires = mtbsImageByYear.sum()
+  .rename('totalFires');
+
+// max number of fires to have occurred in any grid cell
+var maxFires =   totalFires.reduceRegion({
+    reducer: ee.Reducer.max(),
+    geometry: region,
+    scale: scale, // to speed computation for now
+    maxPixels: 1e12,
+    bestEffort: true
+  });
+  
+var maxFires = ee.Number(maxFires.get('totalFires')); // convert to a number
+
+var numFireSeq = ee.List.sequence(ee.Number(1), maxFires);
+
+if(testRun) {
+  print("max num of fires", maxFires);
+}
+
+// image collection where first image shows fire severity for the first time a pixel burned
+// 2nd image is the fire severity for the 2nd time a pixel burned, etc. 
+
+
+
+
+var sevNumFire = numFireSeq.map(function(x) {
+  var numFire = ee.Number(numFire);
+  
+  
+})
+
+
+//print(numFiresSeq);
 
 // /*
 
