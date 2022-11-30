@@ -18,7 +18,7 @@
  * @return {ee.Image}
  * 
 */
-var maskByFireNum = function(image, targetFireNum) {
+exports.maskByFireNum = function(image, targetFireNum) {
   var image2 = ee.Image(image);
   var mask = image2.select('fireNum')
     .eq(ee.Number(targetFireNum))
