@@ -260,13 +260,55 @@ if(testRun) {
 
 
 var sevNumFire = numFireSeq.map(function(x) {
-  var numFire = ee.Number(numFire);
-  
-  
-})
 
+  var mtbsMasked = mtbs4.map(function(image) {
+    return fns.maskByFireNum(ee.Image(image), ee.Number(x));
+  });
+  var out = mtbsMasked
+    .select('Severity')
+    // only one image will have non 0 severity values (assuming the pixel every burned x times)
+    // so the sum is just to extract that value
+    .sum() 
+    .set("numFire", ee.Number(x));
+  
+  return out;
+});
 
-//print(numFiresSeq);
+var sevNumFire = ee.ImageCollection(sevNumFire);
+
+// fire severity of the first time a cell burned will be raised to 0,
+// fire severity for 2nd time burned, is raised to 1 and so on
+var sevBase5ByYear = sevNumFire.map(function(x) {
+  var image = ee.Image(x);
+  var exponent = ee.Number(image.get('numFire')).subtract(1);
+  
+  var out = image.pow(exponent)
+    .rename('sevBase5');
+  return out;
+});
+
+// a base 5 code that when decomposed provides the fire severity
+// of each time the pixel burned (and binSimple images created above
+// tell you which years the pixel burned)
+var sevBase5 = ee.ImageCollection(sevBase5ByYear).sum();
+print(sevBase5);
+
+// CONTINUE HERE--
+
+/*
+Next steps
+create key of sevBase5 to sevSimple
+The create a sevSimple image
+Then create an image summing together sevSimple and binSimple (
+with sevSimple multiplied by 10^(x+1) where x is the maximum number of orders of magnitude of binSimple
+then wher 10^x has bin added to bin simple (as was done with suid). 
+then create an binsSimple-sevSimple image
+then create a key between  binsSimple-sevSimple and a new key binSevSimple
+create image of binSevSimple
+output that image
+as well as the 3 needed keys
+
+*/
 
 // /*
 
