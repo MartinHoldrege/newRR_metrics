@@ -2,6 +2,9 @@
  * The ee module contains misc javascript functions for use
  * in other javascript earth engine scripts in this repository.
  * Module created by Martin Holdrege
+ * 
+ * load like this:
+ * var fns = require("users/mholdrege/newRR_metrics:src/functions.js");
  * @module src/functions.js
  */
  
