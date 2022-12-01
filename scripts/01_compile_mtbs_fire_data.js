@@ -68,7 +68,11 @@ if (testRun) {
 
 var mtbs1 = ee.ImageCollection("USFS/GTAC/MTBS/annual_burn_severity_mosaics/v1")
   .filterDate(startYear + "-01-01", endYear + "-12-31")
-  .filterBounds(region);
+  .filterBounds(region)
+  .map(function(x) {
+    return ee.Image(x).updateMask(mask);
+  });
+
   
 Map.addLayer(mtbs1, {}, 'mtbs', false);
 
@@ -128,23 +132,23 @@ var mtbsBinImageByYear = mtbsImageByYear.map(function(x) {
 // for example if the value of a pixel is 9 that would mean that year 1 and year 4 burned
 // because 9 written in binary is 0000001001, where 1's denote years that burned and 0's denote
 // years that didn't burn 
-var mtbsBinImage = ee.ImageCollection(mtbsBinImageByYear).sum();
-
-var mtbsBinImageM = mtbsBinImage
+var mtbsBinImage = ee.ImageCollection(mtbsBinImageByYear)
+  .sum()
   .unmask() // unburned areas become 0
   .mask(mask) // only including areas that have suid
   .rename('bin');
-  
+
+
 // get all the unique 'binary' fire-year codes
 //(https://gis.stackexchange.com/questions/403785/finding-all-unique-values-in-categorical-image)
-var reduction = mtbsBinImageM.reduceRegion({
+var reduction = mtbsBinImage.reduceRegion({
   reducer: ee.Reducer.frequencyHistogram(), 
   geometry: region,
   scale: scale,
   maxPixels: 1e11
 });
 
-var binUnique = ee.Dictionary(reduction.get(mtbsBinImageM.bandNames().get(0)))
+var binUnique = ee.Dictionary(reduction.get(mtbsBinImage.bandNames().get(0)))
     .keys()
     .map(ee.Number.parse)
     .sort();
@@ -161,7 +165,7 @@ if(testRun) {
 // should also be represented by a binSimple 'key' of 0. 
 var binSimple = ee.List.sequence(ee.Number(0), ee.Number(binUnique.length()).subtract(1));
 
-var binSimpleM = mtbsBinImageM
+var binSimple = mtbsBinImage
   .remap(binUnique, binSimple)
   .rename('binSimple');
 
@@ -309,6 +313,57 @@ output that image
 as well as the 3 needed keys
 
 */
+
+/*
+Creat a key for sevBase5
+
+*/
+
+// var reductionSev = sevBase5.reduceRegion({
+//   reducer: ee.Reducer.frequencyHistogram(), 
+//   geometry: region,
+//   scale: scale,
+//   maxPixels: 1e11
+// });
+
+// var binUnique = ee.Dictionary(reduction.get(mtbsBinImage.bandNames().get(0)))
+//     .keys()
+//     .map(ee.Number.parse)
+//     .sort();
+    
+// if(testRun) {
+//   print('unique bin vals', binUnique);
+//   print('length', binUnique.length());
+//   print(binUnique);
+// }
+
+
+// // creating a new 'binSimple' which is a smaller number based on the
+// // actual number of unique bins. bin of 0 means nothing burned, and this
+// // should also be represented by a binSimple 'key' of 0. 
+// var binSimple = ee.List.sequence(ee.Number(0), ee.Number(binUnique.length()).subtract(1));
+
+// var binSimple = mtbsBinImage
+//   .remap(binUnique, binSimple)
+//   .rename('binSimple');
+
+
+// // create key of bin (ie the actual binary code) and binSimple
+// var binKey = binUnique.zip(binSimple)
+//   .map(function(x) {
+//     var f = ee.Feature(null, 
+//       // using this code here to rename the parts as needed
+//         {bin: ee.List(x).get(0),
+//         binSimple: ee.List(x).get(1)
+//       });
+//     return f;
+//   });
+
+// var binKeyFc = ee.FeatureCollection(binKey);
+
+// if (testRun) {
+//   print('binkey', binKeyFc);
+// }
 
 // /*
 
