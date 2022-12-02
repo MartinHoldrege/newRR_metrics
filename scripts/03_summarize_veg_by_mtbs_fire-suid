@@ -45,7 +45,7 @@ load the data
 var suid1 = ee.Image(pathAsset + 'suid/gsu_masked_v20220314')
   .rename('suid')
   .toDouble() // b/ later create very long numeric codes. 
-  .reproject(crs);
+  //.reproject(crs);
 
 Map.addLayer(suid1, {min: 0, max: 100000}, 'suid', false);
 
@@ -81,8 +81,9 @@ Map.addLayer(region, {}, 'roi', false);
 // and base5 code for fire severity, but a shorter
 // number, the keys to lookup what the associated binary and base5 codes can be found
 // in tablse outputed by that same script
-var binSevSimple = ee.Image(pathAsset + 'fire/mtbs_binSevSimpleM_1986_2020_30m_20221201');
-// print('proj', suid1.projection(), binSevSimple.projection())
+var binSevSimple = ee.Image(pathAsset + 'fire/mtbs_binSevSimpleM_1986_2020_30m_testRun20221202');
+
+
 // rap cover data
 
 /*
