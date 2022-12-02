@@ -296,25 +296,9 @@ var sevBase5 = ee.ImageCollection(sevBase5ByYear)
   .sum()
   .mask(mask);
 
-// CONTINUE HERE--
 
 /*
-Next steps
-create key of sevBase5 to sevSimple
-The create a sevSimple image
-Then create an image summing together sevSimple and binSimple (
-with sevSimple multiplied by 10^(x+1) where x is the maximum number of orders of magnitude of binSimple
-then wher 10^x has bin added to bin simple (as was done with suid). 
-then create an binsSimple-sevSimple image
-then create a key between  binsSimple-sevSimple and a new key binSevSimple
-create image of binSevSimple
-output that image
-as well as the 3 needed keys
-
-*/
-
-/*
-Creat a key for sevBase5
+Create a key for sevBase5
 (i.e. the key that gives the order of fire severities, and a sequence from 0 to the number of )
 
 */
