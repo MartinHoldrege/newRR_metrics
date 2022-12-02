@@ -77,6 +77,51 @@ var meanByGroup = exports.meanByGroup = function(image, bandName, groupName, reg
   return ee.FeatureCollection(meanList);
 };
 
+/**
+ * Area of pixels belonging to each group
+ * 
+ * @param {ee.Image} image input that contains a grouping/classification/id band
+ * @param {ee.String} groupName name of band that will be used for grouping (i.e. the ids)
+ * @param (ee.Feature} region to apply reducer to
+ * @param {ee.Number} scale to using when applying reducer 
+ * 
+ * @return {ee.FeatureCollection} area of each unique value in groupName
+*/
+exports.areaByGroup = function(image, groupName, region, scale) {
+  var areaImage = ee.Image.pixelArea()
+    .addBands(image.select(groupName));
+ 
+  
+  var areas = areaImage.reduceRegion({
+        reducer: ee.Reducer.sum().group({
+        groupField: 1,
+        groupName: groupName,
+      }),
+      geometry: region,
+      scale: scale,
+      maxPixels: 1e12
+      }); 
+  
+  
+  // converting dictionary to a feature collection so that it can be output
+  // to a csv
+  
+  // list where each component is a feature
+  var areasList = ee.List(areas.get('groups')).map(function (x) {
+    
+    var dict = {area_m2: ee.Dictionary(x).get('sum')};
+    
+    // passing groupName as a variable to become the name in the dictionary
+    dict[groupName] = ee.Number(ee.Dictionary(x).get(groupName)).toInt64();
+    
+    return ee.Feature(null, dict);
+  });
+  
+  var areasFc = ee.FeatureCollection(areasList);
+  
+  return areasFc;
+};
+
 
 /**
  * create feature collection where each feature is the mean value of a band
