@@ -16,8 +16,8 @@ Also output the amount of area belonging to each suidBinSimple
 
 var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
 var scale = 30;
-var testRun = false; // false; // is this just a test run--if so code run for a very small area
-var runExports = true; // whether to export csv files
+var testRun = true; // false; // is this just a test run--if so code run for a very small area
+var runExports = false; // whether to export csv files
 var startYear = 1986;
 var endYear = 2020;
 var date = '20221104'; // to be included output in file names
@@ -28,6 +28,7 @@ var crs = 'EPSG:5070'; // projection for output rasters
 // functions from the cheatgrass fire repository
 var fnsC = require("users/mholdrege/cheatgrass_fire:src/ee_functions.js");
 
+var fns = require("users/mholdrege/newRR_metrics:src/functions.js");
 
 /***************************
 
@@ -103,77 +104,27 @@ var rapCov2 = rapCov1
 //print(rapCov2)
 //print(rapCov2.bandNames())
 
+var years = ee.List.sequence(startYear, endYear);
+Map.addLayer(binSimpleImageM, {min:0, max: 10^5, palette: ['Black']}, 'fires all yrs', false);
 
 /*
 
 Functions
 
-some functions here rely on objects in the global environment (hence they can't be put in a seperate
-script and be sourced)
 */
 
-var meanBySuidBin = function(image, bandName) {
-
-  // this creates a dictionary, mean value of the image for each
-  // unique set of pixels (as defined by suidBin)
-  var meanDict = ee.Image(image).select(bandName, 'suidBinSimple').reduceRegion({
-    reducer: ee.Reducer.mean().group({
-      groupField: 1,
-      groupName: 'suidBinSimple',
-    }),
-    geometry: region,
-    scale: scale,
-    maxPixels: 1e12
-  });
-  
-  // return a list where each element is a feature
-  // that contains the mean cover value, name of the image band the mean is of
-  // the suidBin, and the year the image is from
-  var meanList = ee.List(meanDict.get('groups')).map(function (x) {
-    var f = ee.Feature(null, 
-      // using this code here to rename the parts as needed
-        {suidBinSimple: ee.Number(ee.Dictionary(x).get('suidBinSimple')).toInt64(),
-      // area in m^2
-        meanValue: ee.Dictionary(x).get('mean'),
-        bandName: bandName,
-        year: ee.Image(image).get('year')
-      });
-    return f;
-    });
-  
-  return ee.FeatureCollection(meanList);
+// creating new version of the function so that region and scale
+// don't need to be specified (those in the environment are used)
+var mapOverYears = function(ic, bandName, groupName) {
+  return fns.mapOverYears(ic, bandName, groupName, years, region, scale);
 };
-
-// create feature collection where each feature is the mean cover for each year and suidbin
-// ic: image collection (e.g. RAP)
-// bandName: string, name of the band to take means of 
-var mapOverYears = function(ic, bandName) {
-  
-  // mapping over years not the ic because mapping over an ic
-  // requires the output to be a feature or an image
-  // avoiding using toList() b/ of memory issues
-  var fc = years.map(function(year){
-    var image = ic// image collection (i.e. rap cover)
-      .filter(ee.Filter.eq('year',year)).first();
-    
-    // of features providing mean cover for a given suid
-    var out = meanBySuidBin(ee.Image(image), bandName);
-    
-    return out;
-  });
-
-  return ee.FeatureCollection(fc).flatten();
-};
-
-
 /*
 
 Prepare fire data for summarizing
 
 */
 
-var years = ee.List.sequence(startYear, endYear);
-Map.addLayer(binSimpleImageM, {min:0, max: 10^5, palette: ['Black']}, 'fires all yrs', false);
+
 
 
 /*
@@ -277,16 +228,16 @@ print(rapCov3);
 
 
 // annuals
-var meanAFGfc = mapOverYears(rapCov3, 'AFG');
+var meanAFGfc = mapOverYears(rapCov3, 'AFG', 'suidBinSimple');
 
 // perennials
-var meanPFGfc = mapOverYears(rapCov3, 'PFG');
+var meanPFGfc = mapOverYears(rapCov3, 'PFG', 'suidBinSimple');
 
 // shrubs
-var meanSHRfc = mapOverYears(rapCov3, 'SHR');
-
+var meanSHRfc = mapOverYears(rapCov3, 'SHR', 'suidBinSimple');
+ 
 // trees
-var meanTREfc = mapOverYears(rapCov3, 'TRE');
+var meanTREfc = mapOverYears(rapCov3, 'TRE', 'suidBinSimple');
 
 // objects to output
 var rapOut = [
@@ -305,7 +256,6 @@ Save output
 if(testRun) {
   var date = 'testRun' + date;
   
-  print(areasFc);
   print('meanAFGfc', meanAFGfc);
 }
 
