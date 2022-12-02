@@ -20,9 +20,9 @@ var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
 var scale = 30;
 var startYear = 1986;
 var endYear = 2020;
-var testRun = true; // is this just a test run?
+var testRun = false; // is this just a test run?
 var runExports = true; //export assets?
-var date = "20221129"; // for appending to output names
+var date = "20221201"; // for appending to output names
 var crs = 'EPSG:5070';
 
 // dependencies
@@ -153,25 +153,19 @@ var binUnique = ee.Dictionary(reduction.get(mtbsBinImage.bandNames().get(0)))
     .map(ee.Number.parse)
     .sort();
     
-if(testRun) {
-  print('unique bin vals', binUnique);
-  print('length', binUnique.length());
-  print(binUnique);
-}
-
 
 // creating a new 'binSimple' which is a smaller number based on the
 // actual number of unique bins. bin of 0 means nothing burned, and this
 // should also be represented by a binSimple 'key' of 0. 
-var binSimple = ee.List.sequence(ee.Number(0), ee.Number(binUnique.length()).subtract(1));
+var binSimpleSeq = ee.List.sequence(ee.Number(0), ee.Number(binUnique.length()).subtract(1));
 
 var binSimple = mtbsBinImage
-  .remap(binUnique, binSimple)
+  .remap(binUnique, binSimpleSeq)
   .rename('binSimple');
 
 
 // create key of bin (ie the actual binary code) and binSimple
-var binKey = binUnique.zip(binSimple)
+var binKey = binUnique.zip(binSimpleSeq)
   .map(function(x) {
     var f = ee.Feature(null, 
       // using this code here to rename the parts as needed
@@ -294,8 +288,13 @@ var sevBase5ByYear = sevNumFire.map(function(x) {
 // a base 5 code that when decomposed provides the fire severity
 // of each time the pixel burned (and binSimple images created above
 // tell you which years the pixel burned)
-var sevBase5 = ee.ImageCollection(sevBase5ByYear).sum();
-print(sevBase5);
+var sevBase5 = ee.ImageCollection(sevBase5ByYear)
+// removing mask so also sum across pixels that never burned (i.e. sevBase5 should be 0)
+  .map(function(x) {
+    return ee.Image(x).unmask();
+  })
+  .sum()
+  .mask(mask);
 
 // CONTINUE HERE--
 
@@ -316,92 +315,164 @@ as well as the 3 needed keys
 
 /*
 Creat a key for sevBase5
+(i.e. the key that gives the order of fire severities, and a sequence from 0 to the number of )
 
 */
 
-// var reductionSev = sevBase5.reduceRegion({
-//   reducer: ee.Reducer.frequencyHistogram(), 
-//   geometry: region,
-//   scale: scale,
-//   maxPixels: 1e11
-// });
+var reductionSev = sevBase5.reduceRegion({
+  reducer: ee.Reducer.frequencyHistogram(), 
+  geometry: region,
+  scale: scale,
+  maxPixels: 1e11
+});
 
-// var binUnique = ee.Dictionary(reduction.get(mtbsBinImage.bandNames().get(0)))
-//     .keys()
-//     .map(ee.Number.parse)
-//     .sort();
+var base5Unique = ee.Dictionary(reductionSev.get(sevBase5.bandNames().get(0)))
+    .keys()
+    .map(ee.Number.parse)
+    .sort();
     
-// if(testRun) {
-//   print('unique bin vals', binUnique);
-//   print('length', binUnique.length());
-//   print(binUnique);
-// }
+
+// creating a new 'sevSimple' which is a smaller number based on the
+// actual number of unique sevBase5. 
+var sevSimpleSeq = ee.List.sequence(ee.Number(0), ee.Number(base5Unique.length()).subtract(1));
+
+// image but with the 'simple' key (the point is that these will be lower numbers)
+var sevSimple = sevBase5
+  .remap(base5Unique, sevSimpleSeq)
+  .rename('sevSimple');
 
 
-// // creating a new 'binSimple' which is a smaller number based on the
-// // actual number of unique bins. bin of 0 means nothing burned, and this
-// // should also be represented by a binSimple 'key' of 0. 
-// var binSimple = ee.List.sequence(ee.Number(0), ee.Number(binUnique.length()).subtract(1));
+// create key of severity (ie the actual base 5 code) and sevSimple
+var sevKey = base5Unique.zip(sevSimpleSeq)
+  .map(function(x) {
+    var f = ee.Feature(null, 
+      // using this code here to rename the parts as needed
+        {sevBase5: ee.List(x).get(0),
+        sevSimple: ee.List(x).get(1)
+      });
+    return f;
+  });
 
-// var binSimple = mtbsBinImage
-//   .remap(binUnique, binSimple)
-//   .rename('binSimple');
+var sevKeyFc = ee.FeatureCollection(sevKey);
 
+if (testRun) {
+  print('sevkey', sevKeyFc);
+}
 
-// // create key of bin (ie the actual binary code) and binSimple
-// var binKey = binUnique.zip(binSimple)
-//   .map(function(x) {
-//     var f = ee.Feature(null, 
-//       // using this code here to rename the parts as needed
-//         {bin: ee.List(x).get(0),
-//         binSimple: ee.List(x).get(1)
-//       });
-//     return f;
-//   });
-
-// var binKeyFc = ee.FeatureCollection(binKey);
-
-// if (testRun) {
-//   print('binkey', binKeyFc);
-// }
-
-// /*
-
-// Save output
-
-// */
-
-
-
-// if(testRun) {
-//   var date = 'testRun' + date;
-// }
-
-// var s = '_' + startYear + '_' + endYear + '_' + scale + 'm_' + date;
-
-// if(runExports) {
+// combine binSimple (which years burned) and sevSimple (what the intensities were)
+var binSimpleSevSimple = binSimple
+  .add(ee.Image(ee.Number(10).pow(4))) // adding so that all binSimple values are the same number of digits max should be around 5k)
+  .multiply(ee.Image(ee.Number(10).pow(8))) // create space for the sevSimple 
+  .add(sevSimple);
   
-// // key of binary fire code (i.e. so can determine which years actually burned)
-// // and the simple (lower value )
-// Export.table.toDrive({
-//   collection: binKeyFc,
-//   description: 'key_binary-fire-code_simple' + s,
-//   folder: 'newRR_metrics',
-//   fileFormat: 'CSV'
-// });
+// now creating a key between binSimpleSevSimple and binSevSimple 
+var reductionBinSev = binSimpleSevSimple.reduceRegion({
+  reducer: ee.Reducer.frequencyHistogram(), 
+  geometry: region,
+  scale: scale,
+  maxPixels: 1e11
+});
 
-// // here the 'm' in the file name stands for masked--i.e. areas for which suid not 
-// // available are masked out
-// Export.image.toAsset({ 
-//   image: binSimpleImageM, 
-//   assetId: pathAsset + 'fire/cwf_binSimpleM' + s ,
-//   description: 'cwf_binSimpleM' + s ,
-//   maxPixels: 1e13, 
-//   scale: scale, 
-//   region: region,
-//   crs: crs
-// });
+var binSevUnique = ee.Dictionary(reductionBinSev.get(binSimpleSevSimple.bandNames().get(0)))
+    .keys()
+    .map(ee.Number.parse)
+    .sort();
 
-// }
+var binSevSimpleSeq = ee.List.sequence(ee.Number(1), ee.Number(binSevUnique.length()));
+
+// image but with the 'simple' key (the point is that these will be lower numbers)
+var binSevSimple = binSimpleSevSimple
+  .remap(binSevUnique, binSevSimpleSeq)
+  .rename('binSevSimple');
+
+
+var binSevKey = binSevUnique.zip(binSevSimpleSeq)
+  .map(function(x) {
+    
+    var bs = ee.Number(ee.List(x).get(0))
+      .toInt64()
+      .format('%s');     // convert to string
+      
+    // not keeping the first number (index 0, its just a 1), the next 4
+    // digits are the binSimple code
+    var binSimple = ee.Number.parse(bs.slice(1, 5));
+    
+    // the remaining digits make up the sevSimple code
+    var sevSimple = ee.Number.parse(bs.slice(5, 100));
+
+    var f = ee.Feature(null, 
+      // using this code here to rename the parts as needed
+        {binSimpleSevSimple: bs,
+        binSevSimple: ee.List(x).get(1),
+      // including the following two elements
+      // so that this key can more easily be matched
+      // with the sevKey and binKey files
+        binSimple: binSimple,
+        sevSimple: sevSimple
+      });
+    return f;
+  });
+
+var binSevKeyFc = ee.FeatureCollection(binSevKey);
+
+if (testRun) {
+  
+  print('binSevKey', binSevKeyFc);
+}
+  
+/*
+
+Save output
+
+*/
+
+
+
+if(testRun) {
+  var date = 'testRun' + date;
+}
+
+var s = '_' + startYear + '_' + endYear + '_' + scale + 'm_' + date;
+
+if(runExports) {
+  
+// key of binary fire code (i.e. so can determine which years actually burned)
+// and the simple (lower value )
+Export.table.toDrive({
+  collection: binKeyFc,
+  description: 'mtbs_key_binary-fire-code' + s,
+  folder: 'newRR_metrics',
+  fileFormat: 'CSV'
+});
+
+// key for severity fire code (i.e. order of severity of the fires)
+Export.table.toDrive({
+  collection: sevKeyFc,
+  description: 'mtbs_key_severity-fire-code' + s,
+  folder: 'newRR_metrics',
+  fileFormat: 'CSV'
+});
+
+
+Export.table.toDrive({
+  collection: binSevKeyFc,
+  description: 'mtbs_key_binary-severity-fire-code' + s,
+  folder: 'newRR_metrics',
+  fileFormat: 'CSV'
+});
+
+// here the 'M' in the file name stands for masked--i.e. areas for which suid not 
+// available are masked out
+Export.image.toAsset({ 
+  image: binSevSimple, 
+  assetId: pathAsset + 'fire/mtbs_binSevSimpleM' + s ,
+  description: 'mtbs_binSevSimpleM' + s ,
+  maxPixels: 1e13, 
+  scale: scale, 
+  region: region,
+  crs: crs
+});
+
+}
 
 
