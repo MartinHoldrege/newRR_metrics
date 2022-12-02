@@ -118,18 +118,10 @@ Functions
 var mapOverYears = function(ic, bandName, groupName) {
   return fns.mapOverYears(ic, bandName, groupName, years, region, scale);
 };
-/*
-
-Prepare fire data for summarizing
-
-*/
-
-
-
 
 /*
 
-combine suid and bin
+combine suid (simulation unit) and bin (when fires happened)
 
 */
 
@@ -152,13 +144,6 @@ var suidBinSimple = suidLong
   .add(binSimpleImageM.toDouble())
   .rename('suidBinSimple');
 
-/*
-
-Area by suid and bin
-
-Calculating the area of pixels falling in each combination of fire years and
-simulation id. 
-*/
 
 /*
 Area by suidBin
@@ -166,40 +151,11 @@ Calculating the area of pixels falling in each combination of fire years and
 simulation id. 
 */
 
-var areaImage = ee.Image.pixelArea()
-  .addBands(suidBinSimple);
- 
-var areas = areaImage.reduceRegion({
-      reducer: ee.Reducer.sum().group({
-      groupField: 1,
-      groupName: 'suidBinSimple',
-    }),
-    geometry: region,
-    scale: scale,
-    maxPixels: 1e12
-    }); 
-
-
-// converting dictionary to a feature collection so that it can be output
-// to a csv
-
-// list where each component is a feature
-var areasList = ee.List(areas.get('groups')).map(function (x) {
-  return ee.Feature(null, 
-  // using this code here to rename the parts as needed
-  {suidBinSimple: ee.Number(ee.Dictionary(x).get('suidBinSimple')).toInt64(),
-  // area in m^2
-    area_m2: ee.Dictionary(x).get('sum')
-  });
-});
-
-var areasFc = ee.FeatureCollection(areasList);
-
+var areasFc = fns.areaByGroup(suidBinSimple, 'suidBinSimple', region, scale) ;
 
 if(testRun) {
   print('areas fc', areasFc);
 }
-
 
 /*
 
@@ -207,7 +163,6 @@ RAP cover by year and suid and bin
 
 calculating the average cover each year, for each suidBin (i.e. the pixels)
 */
-
 
 var maskSuidBinSimple = suidBinSimple.gte(0).unmask(); 
 
@@ -225,7 +180,6 @@ var rapCov3 = rapCov2.map(function(x) {
 });
 
 print(rapCov3);
-
 
 // annuals
 var meanAFGfc = mapOverYears(rapCov3, 'AFG', 'suidBinSimple');
@@ -246,12 +200,12 @@ var rapOut = [
   ['SHR', meanSHRfc],
   ['TRE', meanTREfc]
   ];
+
 /*
 
 Save output
 
 */
-
 
 if(testRun) {
   var date = 'testRun' + date;
@@ -295,9 +249,4 @@ if (runExports) {
     });
   }
 }
-
-
-
-
-
 
