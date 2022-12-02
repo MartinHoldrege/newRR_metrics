@@ -84,6 +84,8 @@ Map.addLayer(region, {}, 'roi', false);
 var binSevSimple = ee.Image(pathAsset + 'fire/mtbs_binSevSimpleM_1986_2020_30m_testRun20221202');
 
 Map.addLayer(binSevSimple, {min:0, max: 10^5, palette: ['blue']}, 'binSevSimple', false, 0.5);
+
+print(binSevSimple.projection())
 // rap cover data
 
 /*
