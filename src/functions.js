@@ -35,9 +35,9 @@ exports.maskByFireNum = function(image, targetFireNum) {
  * Means of one band by another grouping band
  * 
  * @param {ee.Image} image input image that contains at least two bands. must have 'year' property
- * @param {ee.String) bandName name of band to take mean of
- * @param {ee.String) groupName name of band that will be used for grouping (i.e. the ids)
- * @param (ee.Feature) region to apply reducer to
+ * @param {ee.String} bandName name of band to take mean of
+ * @param {ee.String} groupName name of band that will be used for grouping (i.e. the ids)
+ * @param (ee.Feature} region to apply reducer to
  * @param {ee.Number} scale to using when applying reducer 
  * 
  * @return {ee.FeatureCollection} feature collection giving mean values of bandName for 
@@ -82,17 +82,18 @@ var meanByGroup = exports.meanByGroup = function(image, bandName, groupName, reg
  * create feature collection where each feature is the mean value of a band
  * for each year and id (from bandName)
  * 
- * @param {ee.ImageCollection) image collection of yearly data (e.g. RAP), must have a
+ * @param {ee.ImageCollection} image collection of yearly data (e.g. RAP), must have a
  * 'year' property
- * @param {ee.String) bandName name of band to take mean of
- * @param {ee.String) groupName name of band that will be used for grouping (i.e. the ids)
- * @param (ee.Feature) region to apply reducer to
+ * @param {ee.String} bandName name of band to take mean of
+ * @param {ee.List} years list of years to map over
+ * @param {ee.String} groupName name of band that will be used for grouping (i.e. the ids)
+ * @param {ee.Feature} region to apply reducer to
  * @param {ee.Number} scale to using when applying reducer 
  * 
  * @return {ee.FeatureCollection} feature collection giving mean values of bandName for 
  * each unique value in groupName for each year 
 */
-exports.mapOverYears = function(ic, bandName, groupName, region, scale) {
+exports.mapOverYears = function(ic, bandName, groupName, years, region, scale) {
   
   // mapping over years not the ic because mapping over an ic
   // requires the output to be a feature or an image
