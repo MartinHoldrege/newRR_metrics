@@ -13,6 +13,8 @@ Started: 11/29/2022
 
 */
 
+// NEXT--figure out crs problem so that the saved asset matches up
+// with the suid raster
 
 // Constants
 
@@ -20,10 +22,10 @@ var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
 var scale = 30;
 var startYear = 1986;
 var endYear = 2020;
-var testRun = false; // is this just a test run?
+var testRun = true; // is this just a test run?
 var runExports = true; //export assets?
-var date = "20221201"; // for appending to output names
-var crs = 'EPSG:5070';
+var date = "20221202"; // for appending to output names
+
 
 // dependencies
 
@@ -45,7 +47,7 @@ var suid1 = ee.Image(pathAsset + 'suid/gsu_masked_v20220314')
   .rename('suid');
 
 var mask = suid1.unmask().neq(0).rename('mask');
-Map.addLayer(mask, {min: 0, max: 1, palette: ['white', 'black']}, 'mask', false);
+Map.addLayer(mask, {min: 0, max: 1, palette: ['white', 'black']}, 'mask', false, 0.5);
 // region of interest
 
 var biome = ee.FeatureCollection("projects/gee-guest/assets/SEI/US_Sagebrush_Biome_2019"); // provided by DT
@@ -73,10 +75,10 @@ var mtbs1 = ee.ImageCollection("USFS/GTAC/MTBS/annual_burn_severity_mosaics/v1")
     return ee.Image(x).updateMask(mask);
   });
 
-  
+var wkt = mtbs1.first().projection().wkt().getInfo()
 Map.addLayer(mtbs1, {}, 'mtbs', false);
 
-
+print('suid projection', suid1.projection(), 'mtbs proj', mtbs1.first().projection())
 /*
 
 Prepare fire data for summarizing
@@ -369,7 +371,7 @@ var binSevSimple = binSimpleSevSimple
   .remap(binSevUnique, binSevSimpleSeq)
   .rename('binSevSimple');
 
-
+Map.addLayer(binSevSimple, {palette: 'red'}, "binSevSeimple", false, 0.5);
 var binSevKey = binSevUnique.zip(binSevSimpleSeq)
   .map(function(x) {
     
@@ -454,7 +456,7 @@ Export.image.toAsset({
   maxPixels: 1e13, 
   scale: scale, 
   region: region,
-  crs: crs
+  crs: wkt
 });
 
 }
