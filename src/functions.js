@@ -159,6 +159,6 @@ exports.mapOverYears = function(ic, bandName, groupName, years, region, scale) {
 
 // wkt 
 // so can use the same projection in multiple places
-var mtbs1 = ee.ImageCollection("USFS/GTAC/MTBS/annual_burn_severity_mosaics/v1").first();
+var mtbs1 = ee.ImageCollection("USFS/GTAC/MTBS/annual_burn_severity_mosaics/v1");
 
 exports.wktUSGS = mtbs1.first().projection().wkt().getInfo();
