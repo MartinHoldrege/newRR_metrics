@@ -14,7 +14,8 @@ Started: 11/29/2022
 */
 
 // NEXT--figure out crs problem so that the saved asset matches up
-// with the suid raster
+// with the suid raster. read in re-projected suid file, and use that layer throughout
+// as well as the mtbs wkt
 
 // Constants
 
