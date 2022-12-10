@@ -142,7 +142,8 @@ if(testRun) {
   Map.addLayer(suidLong, {palette: 'black'}, 'suid Long', false);
 } 
 
-
+print('binSevSimple', binSevSimple.projection(),
+      'suidLong', suidLong.projection());
 // combined suid and cwf binary codes
 var suidBinSevSimple = suidLong
   .mask(mask)
