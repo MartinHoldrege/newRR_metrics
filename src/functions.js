@@ -159,6 +159,9 @@ exports.mapOverYears = function(ic, bandName, groupName, years, region, scale) {
 
 // wkt 
 // so can use the same projection in multiple places
-var mtbs1 = ee.ImageCollection("USFS/GTAC/MTBS/annual_burn_severity_mosaics/v1");
+var projUSGS = ee.Projection("PROJCS[\"USA_Contiguous_Albers_Equal_Area_Conic_USGS_version\", \n  GEOGCS[\"GCS_North_American_1983\", \n    DATUM[\"D_North_American_1983\", \n      SPHEROID[\"GRS_1980\", 6378137.0, 298.257222101]], \n    PRIMEM[\"Greenwich\", 0.0], \n    UNIT[\"degree\", 0.017453292519943295], \n    AXIS[\"Longitude\", EAST], \n    AXIS[\"Latitude\", NORTH]], \n  PROJECTION[\"Albers_Conic_Equal_Area\"], \n  PARAMETER[\"central_meridian\", -96.0], \n  PARAMETER[\"latitude_of_origin\", 23.0], \n  PARAMETER[\"standard_parallel_1\", 29.5], \n  PARAMETER[\"false_easting\", 0.0], \n  PARAMETER[\"false_northing\", 0.0], \n  PARAMETER[\"standard_parallel_2\", 45.5], \n  UNIT[\"m\", 1.0], \n  AXIS[\"x\", EAST], \n  AXIS[\"y\", NORTH]]")
 
-exports.wktUSGS = mtbs1.first().projection().wkt().getInfo();
+var wktUSGS = exports.wktUSGS = projUSGS.wkt().getInfo();
+
+
+
