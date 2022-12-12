@@ -24,7 +24,7 @@ var scale = 30;
 var startYear = 1986;
 var endYear = 2020;
 var testRun = true; // is this just a test run?
-var runExports = true; //export assets?
+var runExports = false; //export assets?
 var date = "20221212"; // for appending to output names
 
 
@@ -43,6 +43,7 @@ load the data
 // has a number which corresponds to the nrcs soil unit polygon that it belongs to. 
 // resolution is 30 m. Certain 'non drylands' have been masked out for this analysis. 
 // here just using this layer for masking
+// this version of the file has been re-projected to the same projection as MTBS
 
 var suid1 = ee.Image(pathAsset + 'suid/gsu_masked_v20220314_wktUSGS')
   .rename('suid');
@@ -76,10 +77,15 @@ var mtbs1 = ee.ImageCollection("USFS/GTAC/MTBS/annual_burn_severity_mosaics/v1")
     return ee.Image(x).updateMask(mask);
   });
 
-var wkt = mtbs1.first().projection().wkt().getInfo()
+
 Map.addLayer(mtbs1, {}, 'mtbs', false);
 
-print('suid projection', suid1.projection(), 'mtbs proj', mtbs1.first().projection())
+if(testRun) {
+  print('suid projection', suid1.projection(), 
+        'mtbs proj', mtbs1.first().projection());
+}
+
+
 /*
 
 Prepare fire data for summarizing
@@ -457,7 +463,7 @@ Export.image.toAsset({
   maxPixels: 1e13, 
   scale: scale, 
   region: region,
-  crs: wkt
+  crs: fns.wkt
 });
 
 }
