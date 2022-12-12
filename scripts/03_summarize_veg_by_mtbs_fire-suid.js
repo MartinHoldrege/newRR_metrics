@@ -42,10 +42,9 @@ load the data
 // has a number which corresponds to the nrcs soil unit polygon that it belongs to. 
 // resolution is 30 m. Certain 'non drylands' have been masked out for this analysis. 
 
-var suid1 = ee.Image(pathAsset + 'suid/gsu_masked_v20220314')
+var suid1 = ee.Image(pathAsset + 'suid/gsu_masked_v20220314_wktUSGS')
   .rename('suid')
-  .toDouble() // b/ later create very long numeric codes. 
-  //.reproject(crs);
+  .toDouble(); // b/ later create very long numeric codes. 
 
 Map.addLayer(suid1, {min: 0, max: 100000}, 'suid', false);
 
@@ -81,9 +80,9 @@ Map.addLayer(region, {}, 'roi', false);
 // and base5 code for fire severity, but a shorter
 // number, the keys to lookup what the associated binary and base5 codes can be found
 // in tablse outputed by that same script
-var binSevSimple = ee.Image(pathAsset + 'fire/mtbs_binSevSimpleM_1986_2020_30m_testRun20221202');
+var binSevSimple = ee.Image(pathAsset + 'fire/mtbs_binSevSimpleM_1986_2020_30m_testRun20221212');
 
-
+print(binSevSimple.projection(), suid1.projection())
 // rap cover data
 
 /*
