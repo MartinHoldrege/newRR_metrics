@@ -25,7 +25,7 @@ var startYear = 1986;
 var endYear = 2020;
 var testRun = true; // is this just a test run?
 var runExports = true; //export assets?
-var date = "20221202"; // for appending to output names
+var date = "20221212"; // for appending to output names
 
 
 // dependencies
@@ -44,7 +44,7 @@ load the data
 // resolution is 30 m. Certain 'non drylands' have been masked out for this analysis. 
 // here just using this layer for masking
 
-var suid1 = ee.Image(pathAsset + 'suid/gsu_masked_v20220314')
+var suid1 = ee.Image(pathAsset + 'suid/gsu_masked_v20220314_wktUSGS')
   .rename('suid');
 
 var mask = suid1.unmask().neq(0).rename('mask');
