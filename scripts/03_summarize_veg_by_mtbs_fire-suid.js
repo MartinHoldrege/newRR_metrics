@@ -17,12 +17,11 @@ Also output the amount of area belonging to each suidBinSevSimple
 
 var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
 var scale = 30;
-var testRun = true; // false; // is this just a test run--if so code run for a very small area
-var runExports = false; // whether to export csv files
+var testRun = false; //true; //  is this just a test run--if so code run for a very small area
+var runExports = true; // whether to export csv files
 var startYear = 1986;
 var endYear = 2020;
-var date = '20221202'; // to be included output in file names
-var crs = 'EPSG:5070'; // projection for output rasters
+var date = '20221212'; // to be included output in file names
 
 // dependencies
 
@@ -80,9 +79,9 @@ Map.addLayer(region, {}, 'roi', false);
 // and base5 code for fire severity, but a shorter
 // number, the keys to lookup what the associated binary and base5 codes can be found
 // in tablse outputed by that same script
-var binSevSimple = ee.Image(pathAsset + 'fire/mtbs_binSevSimpleM_1986_2020_30m_testRun20221212');
+var binSevSimple = ee.Image(pathAsset + 'fire/mtbs_binSevSimpleM_1986_2020_30m_20221212');
 
-print(binSevSimple.projection(), suid1.projection())
+
 // rap cover data
 
 /*
@@ -231,7 +230,7 @@ if (runExports) {
     maxPixels: 1e13, 
     scale: scale,
     region: region,
-    crs: crs,
+    crs: fns.wktUSGS,
     fileFormat: 'GeoTIFF'
   });
     
