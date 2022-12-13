@@ -2,6 +2,8 @@
 data_processed/*
 data_raw/*
 
+# misc
+*.docx
 # History files
 .Rhistory
 .Rapp.history
