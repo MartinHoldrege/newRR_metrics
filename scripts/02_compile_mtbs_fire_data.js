@@ -23,8 +23,8 @@ var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
 var scale = 30;
 var startYear = 1986;
 var endYear = 2020;
-var testRun = true; // is this just a test run?
-var runExports = false; //export assets?
+var testRun = false; // is this just a test run?
+var runExports = true; //export assets?
 var date = "20221212"; // for appending to output names
 
 
@@ -147,7 +147,6 @@ var mtbsBinImage = ee.ImageCollection(mtbsBinImageByYear)
   .mask(mask) // only including areas that have suid
   .rename('bin');
 
-
 // get all the unique 'binary' fire-year codes
 //(https://gis.stackexchange.com/questions/403785/finding-all-unique-values-in-categorical-image)
 var reduction = mtbsBinImage.reduceRegion({
@@ -206,7 +205,6 @@ var mtbs3= mtbs2.map(function(x) {
     .rename("Severity");
   return out;
 });
-
 
 // if a given pixel burned burned that year, shows if this is the 1st, 2nd, 3rd etc. fire
 var fireNum = years.map(function(yr) {
@@ -427,6 +425,7 @@ if(testRun) {
 
 var s = '_' + startYear + '_' + endYear + '_' + scale + 'm_' + date;
 
+
 if(runExports) {
   
 // key of binary fire code (i.e. so can determine which years actually burned)
@@ -463,7 +462,7 @@ Export.image.toAsset({
   maxPixels: 1e13, 
   scale: scale, 
   region: region,
-  crs: fns.wkt
+  crs: fns.wktUSGS
 });
 
 }
