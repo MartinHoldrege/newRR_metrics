@@ -16,7 +16,7 @@ source("../SEI/src/general_functions.R")
 
 # get file paths drive --------------------------------------------------------
 
-
+drive_auth(email = "mholdrege@gcp.usgs.gov")
 files1 <- drive_ls(path = "newRR_metrics")
 files1
 

@@ -21,7 +21,7 @@ source('src/functions.R')
 
 # constants ---------------------------------------------------------------
 
-date_string <- "20221213" # for appending to files
+date_string <- "20221214" # for appending to files
 
 # load data ---------------------------------------------------------------
 
@@ -32,14 +32,14 @@ date_string <- "20221213" # for appending to files
 # keeping main portion of file name for naming of output files
 area_name_base <- "area-by-suidBinSevSimple_mtbs_1986_2020_30m_"
 area1 <- read_csv(paste0("data_processed/area/", area_name_base, 
-                         "20221212.csv"),
+                         "20221213.csv"),
                   col_types = 'cccc')
 
 # * keys ------------------------------------------------------------------
 # keys created in 02_compile_fire_data_mtbs.js
 
 yr_res <- "_1986_2020_30m_" # time period and resolution of underlying data 
-key_base <- paste0(yr_res, "20221212.csv")
+key_base <- paste0(yr_res, "20221213.csv")
 
 # binary fire code (i.e. which years burned)
 key_bin1 <- read_csv(paste0("data_processed/key/mtbs_key_binary-fire-code",
@@ -67,11 +67,10 @@ rap_paths <- paste0("data_processed/RAP/RAP_",
                     #c("AFG", "PFG", "SHR", "TRE"),
                     "AFG",
                     "-by-suidBinSevSimple-year_mtbs", 
-                    yr_res, "20221212.csv")
+                    yr_res, "20221213.csv")
 
 # suidBinSevSimple is a longer number, so safer to keep as character
 rap1 <- map(rap_paths, read_csv, col_types = 'ccdcdc')
-
 
 # * raster of ids ---------------------------------------------------------
 # GEE outputs lare images as multiple tiles, here I'm combining them
@@ -80,12 +79,12 @@ rap1 <- map(rap_paths, read_csv, col_types = 'ccdcdc')
 r_paths <- list.files("data_processed/id_raster/",
                       pattern = paste0("suidBinSevSimple_mtbs",
                                        yr_res,
-                                       "20221212"),
+                                       "20221213"),
                       full.names = TRUE)
 
 r_id_l <- map(r_paths, rast)
-# process keys ------------------------------------------------------------
 
+# process keys ------------------------------------------------------------
 
 key_bin2 <- key_bin1 %>% 
   # accidentally stored as decimals (e.g. 1.0), should be digits
@@ -98,9 +97,14 @@ key_sev2 <- key_sev1 %>%
 
 # error checking. The different keys tables should
 # have matching 'id' columns
-same_elements(key_binsev1$binSimple, key_bin2$binSimple)
-same_elements(key_binsev1$sevSimple, key_sev2$sevSimple)
+stopifnot(
+  same_elements(key_binsev1$binSimple, key_bin2$binSimple),
+  same_elements(key_binsev1$sevSimple, key_sev2$sevSimple)
+)
 
+# only room in suidBinSimple for 5 digits, so if larger
+# binSimple value it will get cut off
+stopifnot(max(as.numeric(key_bin2$binSimple)) < 10^5)
 
 # key matching the bin id (a long integer) to the binSimple (a short integer)
 # this key was created in 02_compile_fire_data.js
@@ -117,11 +121,8 @@ key1 <- key_binsev1 %>%
          n_yrs_burned = map_dbl(years_burned, length),
          binSevSimple = str_replace(binSevSimple, "\\.0$", ""))
 
-# continue HERE
-# and work 
-# only room in suidBinSimple for 5 digits, so if larger
-# binSimple value it will get cut off
-stopifnot(max(key2$binSimple) < 10^5)
+key2 <- key1 %>% 
+  mutate(years_severity = base2severity(as.numeric(sevBase6)))
 
 # years that show up as burned in the dataset
 years_burned <- key2$years_burned %>% unlist() 
@@ -140,27 +141,43 @@ stopifnot(max(years_burned) == 2020,
 # process area ------------------------------------------------------------
 
 area2 <- area1 %>% 
-  select(area_m2, suidBinSimple) %>% 
-  mutate(suid = str_extract(suidBinSimple, "^\\d{6}"),
+  select(area_m2, suidBinSevSimple) %>% 
+  mutate(suid = str_extract(suidBinSevSimple, "^\\d{6}"),
          # convert back to the original suid that daniel used
          suid = as.numeric(suid) - 10^5,
          # the remaining digits are the binomial identifier code
          # that denotes which years (from 1986-2020) actually burned. 
-         binSimple = as.integer(str_replace(suidBinSimple, '^\\d{6}', "")),
+         binSevSimple = as.integer(str_replace(suidBinSevSimple, '^\\d{6}', "")),
+         binSevSimple = as.character(binSevSimple),
          area_ha = as.numeric(area_m2)/10^4) %>% 
   select(-area_m2)
 
+# binSevSimple of 0 means that you actually were adding across masked
+# out grid cells--this may be a partial grid cell match up problem
+# due to projections
+area_other <- area2 %>% 
+  filter(binSevSimple == "0")
 
-# check for errors
-stopifnot(area2$binSimple %in% key2$binSimple)
+# total area belonging to these 'wrong' slivers (this is being discarded)
+sum(area_other$area_ha)
 
-# add in information about about each binSimple
 area3 <- area2 %>% 
-  left_join(select(key2, -years_burned), by = "binSimple") %>% 
-  select(-binSimple, - bin)
+  filter(binSevSimple != "0")
 
-area3
+# note that area3$binsSevSimple does not contain all
+# the values that are found in key2. I'm not sure why that
+# is--something worth investigating. But for now it's most
+# important that at least the key contains all values in the
+# area file--which appears to be true
+stopifnot(area3$binSevSimple %in% key2$binSevSimple)
 
+# add in information about about each binSevSimple
+area4 <- key2 %>% 
+  select(binSevSimple, years_burned_chr, n_yrs_burned, years_severity) %>% 
+  right_join(area3, "binSevSimple")
+
+area4 %>% 
+  arrange(desc(n_yrs_burned))
 
 # process RAP -------------------------------------------------------------
 

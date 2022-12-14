@@ -84,11 +84,50 @@ bin_years_burned <- function(x, yearStart = 1986, yearEnd = 2020) {
   years_burned
 }
 
-# Continue HERE
-base5 <- 3152
-base6_severity <- function(base5) {
-  x <- base2base(base5, frombase = 10, tobase = 6)
-  x
+
+#' convert a single integer to base 6
+#' 
+#' @description used in base2severity function, defined below
+#'
+#' @param x integer
+#'
+#' @return string where fire severity of each fire is returned (values from 1-5)
+#' with _ seperating the firest
+
+#' @examples
+#' base2severity_single(7)
+#' base2severity(4385)
+base2severity_single <- function(x ) {
+  stopifnot(length(x) == 1,
+            is.numeric(x))
+  
+  # base2base function doesn't seem to work for 0s
+  if(x == 0) return("")
+  
+  if(x < 6) return(as.character(x))
+  
+  out_list <- cgwtools::base2base(x, frombase = 10, tobase = 6)
+  
+  # reverse order so that the first spot is fire severity of the 
+  # first fire, 2nd spot is severity of 2nd fire and so on
+  out <- paste(rev(out_list[[1]]), collapse = "_")
+  out
+}
+
+#' convert numbers to fire severity order
+#'
+#' @param x numeric vector of base 10 numbers that should
+#' be convert to base 6
+#'
+#' @return character vector, where each element gives the order of 
+#' fire severities
+#' @examples
+#' base2severity(c(3152, 1, 8, 0))
+base2severity <- function(x) {
+  
+  out <- map_chr(x, base2severity_single)
+  
+  out
 }
 
 
