@@ -9,7 +9,7 @@
 # by a binomial code) and
 # simulation units ( ie the suidBin)
 # Additionally compile the data on mean cover for each year and suidBin
-
+# this is data compiled based on the combined wildfire data set
 
 
 # dependencies ------------------------------------------------------------
