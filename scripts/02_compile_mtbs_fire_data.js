@@ -292,9 +292,11 @@ var sevBase5ByYear = sevNumFire.map(function(x) {
   return out;
 });
 
-// a base 5 code that when decomposed provides the fire severity
+// a base 6 code that when decomposed provides the fire severity
 // of each time the pixel burned (and binSimple images created above
 // tell you which years the pixel burned)
+// note this is actually base 6 code (max digit is 5), but named
+// base5 in error-when decoding treat it as a base 6 number
 var sevBase5 = ee.ImageCollection(sevBase5ByYear)
 // removing mask so also sum across pixels that never burned (i.e. sevBase5 should be 0)
   .map(function(x) {
