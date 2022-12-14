@@ -118,7 +118,7 @@ key1 <- key_binsev1 %>%
          binSevSimple = str_replace(binSevSimple, "\\.0$", ""))
 
 # continue HERE
-
+# and work 
 # only room in suidBinSimple for 5 digits, so if larger
 # binSimple value it will get cut off
 stopifnot(max(key2$binSimple) < 10^5)
