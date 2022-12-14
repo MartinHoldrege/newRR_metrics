@@ -21,7 +21,7 @@ var testRun = false; //true; //  is this just a test run--if so code run for a v
 var runExports = true; // whether to export csv files
 var startYear = 1986;
 var endYear = 2020;
-var date = '20221212'; // to be included output in file names
+var date = '20221213'; // to be included output in file names
 
 // dependencies
 
@@ -79,7 +79,7 @@ Map.addLayer(region, {}, 'roi', false);
 // and base5 code for fire severity, but a shorter
 // number, the keys to lookup what the associated binary and base5 codes can be found
 // in tablse outputed by that same script
-var binSevSimple = ee.Image(pathAsset + 'fire/mtbs_binSevSimpleM_1986_2020_30m_20221212');
+var binSevSimple = ee.Image(pathAsset + 'fire/mtbs_binSevSimpleM_1986_2020_30m_20221213');
 
 
 // rap cover data
