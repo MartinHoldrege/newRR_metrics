@@ -65,7 +65,7 @@ drive_download_from_df(rap_files, folder_path = "data_processed/RAP")
 # key matching the bin id and binSimple id
 
 files2 %>%
-  filter(str_detect(name, '^key.*\\.csv$')) %>% 
+  filter(str_detect(name, 'key_.*\\.csv$')) %>% 
   drive_download_from_df(., folder_path = "data_processed/key")
 
 
@@ -75,4 +75,10 @@ files2 %>%
 
 files2 %>% 
   filter(str_detect(name, "suidBinSimple_.*tif")) %>% 
+  drive_download_from_df(folder_path = "data_processed/id_raster")
+
+# raster that includes fire severity in the id
+
+files2 %>% 
+  filter(str_detect(name, "suidBinSevSimple_.*tif")) %>% 
   drive_download_from_df(folder_path = "data_processed/id_raster")

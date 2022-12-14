@@ -83,3 +83,25 @@ bin_years_burned <- function(x, yearStart = 1986, yearEnd = 2020) {
   
   years_burned
 }
+
+# Continue HERE
+base5 <- 3152
+base6_severity <- function(base5) {
+  x <- base2base(base5, frombase = 10, tobase = 6)
+  x
+}
+
+
+#' check that two vectors contain the same elements
+#'
+#' @param x vector
+#' @param y vector
+#'
+#' @return logical
+#' @examples
+#' same_elements(1:2, c(2:1, 2))
+#' same_elements(1:3, 1:2)
+same_elements <- function(x, y) {
+  all(x %in% y) & all(y %in% x)
+}
+
