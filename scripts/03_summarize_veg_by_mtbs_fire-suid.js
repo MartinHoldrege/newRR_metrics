@@ -17,12 +17,11 @@ Also output the amount of area belonging to each suidBinSevSimple
 
 var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
 var scale = 30;
-var testRun = true; // false; // is this just a test run--if so code run for a very small area
-var runExports = false; // whether to export csv files
+var testRun = false; //true; //  is this just a test run--if so code run for a very small area
+var runExports = true; // whether to export csv files
 var startYear = 1986;
 var endYear = 2020;
-var date = '20221202'; // to be included output in file names
-var crs = 'EPSG:5070'; // projection for output rasters
+var date = '20221212'; // to be included output in file names
 
 // dependencies
 
@@ -42,10 +41,9 @@ load the data
 // has a number which corresponds to the nrcs soil unit polygon that it belongs to. 
 // resolution is 30 m. Certain 'non drylands' have been masked out for this analysis. 
 
-var suid1 = ee.Image(pathAsset + 'suid/gsu_masked_v20220314')
+var suid1 = ee.Image(pathAsset + 'suid/gsu_masked_v20220314_wktUSGS')
   .rename('suid')
-  .toDouble() // b/ later create very long numeric codes. 
-  //.reproject(crs);
+  .toDouble(); // b/ later create very long numeric codes. 
 
 Map.addLayer(suid1, {min: 0, max: 100000}, 'suid', false);
 
@@ -81,7 +79,7 @@ Map.addLayer(region, {}, 'roi', false);
 // and base5 code for fire severity, but a shorter
 // number, the keys to lookup what the associated binary and base5 codes can be found
 // in tablse outputed by that same script
-var binSevSimple = ee.Image(pathAsset + 'fire/mtbs_binSevSimpleM_1986_2020_30m_testRun20221202');
+var binSevSimple = ee.Image(pathAsset + 'fire/mtbs_binSevSimpleM_1986_2020_30m_20221212');
 
 
 // rap cover data
@@ -232,7 +230,7 @@ if (runExports) {
     maxPixels: 1e13, 
     scale: scale,
     region: region,
-    crs: crs,
+    crs: fns.wktUSGS,
     fileFormat: 'GeoTIFF'
   });
     

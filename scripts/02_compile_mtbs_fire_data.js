@@ -23,9 +23,9 @@ var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
 var scale = 30;
 var startYear = 1986;
 var endYear = 2020;
-var testRun = true; // is this just a test run?
+var testRun = false; // is this just a test run?
 var runExports = true; //export assets?
-var date = "20221202"; // for appending to output names
+var date = "20221213"; // for appending to output names
 
 
 // dependencies
@@ -43,8 +43,9 @@ load the data
 // has a number which corresponds to the nrcs soil unit polygon that it belongs to. 
 // resolution is 30 m. Certain 'non drylands' have been masked out for this analysis. 
 // here just using this layer for masking
+// this version of the file has been re-projected to the same projection as MTBS
 
-var suid1 = ee.Image(pathAsset + 'suid/gsu_masked_v20220314')
+var suid1 = ee.Image(pathAsset + 'suid/gsu_masked_v20220314_wktUSGS')
   .rename('suid');
 
 var mask = suid1.unmask().neq(0).rename('mask');
@@ -76,10 +77,15 @@ var mtbs1 = ee.ImageCollection("USFS/GTAC/MTBS/annual_burn_severity_mosaics/v1")
     return ee.Image(x).updateMask(mask);
   });
 
-var wkt = mtbs1.first().projection().wkt().getInfo()
+
 Map.addLayer(mtbs1, {}, 'mtbs', false);
 
-print('suid projection', suid1.projection(), 'mtbs proj', mtbs1.first().projection())
+if(testRun) {
+  print('suid projection', suid1.projection(), 
+        'mtbs proj', mtbs1.first().projection());
+}
+
+
 /*
 
 Prepare fire data for summarizing
@@ -141,7 +147,6 @@ var mtbsBinImage = ee.ImageCollection(mtbsBinImageByYear)
   .mask(mask) // only including areas that have suid
   .rename('bin');
 
-
 // get all the unique 'binary' fire-year codes
 //(https://gis.stackexchange.com/questions/403785/finding-all-unique-values-in-categorical-image)
 var reduction = mtbsBinImage.reduceRegion({
@@ -200,7 +205,6 @@ var mtbs3= mtbs2.map(function(x) {
     .rename("Severity");
   return out;
 });
-
 
 // if a given pixel burned burned that year, shows if this is the 1st, 2nd, 3rd etc. fire
 var fireNum = years.map(function(yr) {
@@ -277,22 +281,25 @@ var sevNumFire = numFireSeq.map(function(x) {
 
 var sevNumFire = ee.ImageCollection(sevNumFire);
 
-// fire severity of the first time a cell burned will be raised to 0,
-// fire severity for 2nd time burned, is raised to 1 and so on
-var sevBase5ByYear = sevNumFire.map(function(x) {
+// fire severity of the first time a cell burned will be multiplied by 6^0,
+// fire severity for 2nd time burned will be multiplied by 6^1
+var sevBase6ByYear = sevNumFire.map(function(x) {
   var image = ee.Image(x);
   var exponent = ee.Number(image.get('numFire')).subtract(1);
-  
-  var out = image.pow(exponent)
-    .rename('sevBase5');
+  var multiplier = ee.Number(6).pow(exponent);
+  var out = image.multiply(ee.Image(multiplier))
+    .toDouble()
+    .rename('sevBase6');
   return out;
 });
 
-// a base 5 code that when decomposed provides the fire severity
+// a base 6 code that when decomposed provides the fire severity
 // of each time the pixel burned (and binSimple images created above
 // tell you which years the pixel burned)
-var sevBase5 = ee.ImageCollection(sevBase5ByYear)
-// removing mask so also sum across pixels that never burned (i.e. sevBase5 should be 0)
+// note this is actually base 6 code (max digit is 5), but originally named
+// base5 in error-when decoding treat it as a base 6 number
+var sevBase6 = ee.ImageCollection(sevBase6ByYear)
+// removing mask so also sum across pixels that never burned (i.e. sevBase6 should be 0)
   .map(function(x) {
     return ee.Image(x).unmask();
   })
@@ -301,40 +308,40 @@ var sevBase5 = ee.ImageCollection(sevBase5ByYear)
 
 
 /*
-Create a key for sevBase5
+Create a key for sevBase6
 (i.e. the key that gives the order of fire severities, and a sequence from 0 to the number of )
 
 */
 
-var reductionSev = sevBase5.reduceRegion({
+var reductionSev = sevBase6.reduceRegion({
   reducer: ee.Reducer.frequencyHistogram(), 
   geometry: region,
   scale: scale,
   maxPixels: 1e11
 });
 
-var base5Unique = ee.Dictionary(reductionSev.get(sevBase5.bandNames().get(0)))
+var base6Unique = ee.Dictionary(reductionSev.get(sevBase6.bandNames().get(0)))
     .keys()
     .map(ee.Number.parse)
     .sort();
     
 
 // creating a new 'sevSimple' which is a smaller number based on the
-// actual number of unique sevBase5. 
-var sevSimpleSeq = ee.List.sequence(ee.Number(0), ee.Number(base5Unique.length()).subtract(1));
+// actual number of unique sevBase6. 
+var sevSimpleSeq = ee.List.sequence(ee.Number(0), ee.Number(base6Unique.length()).subtract(1));
 
 // image but with the 'simple' key (the point is that these will be lower numbers)
-var sevSimple = sevBase5
-  .remap(base5Unique, sevSimpleSeq)
+var sevSimple = sevBase6
+  .remap(base6Unique, sevSimpleSeq)
   .rename('sevSimple');
 
 
 // create key of severity (ie the actual base 5 code) and sevSimple
-var sevKey = base5Unique.zip(sevSimpleSeq)
+var sevKey = base6Unique.zip(sevSimpleSeq)
   .map(function(x) {
     var f = ee.Feature(null, 
       // using this code here to rename the parts as needed
-        {sevBase5: ee.List(x).get(0),
+        {sevBase6: ee.List(x).get(0),
         sevSimple: ee.List(x).get(1)
       });
     return f;
@@ -421,6 +428,7 @@ if(testRun) {
 
 var s = '_' + startYear + '_' + endYear + '_' + scale + 'm_' + date;
 
+
 if(runExports) {
   
 // key of binary fire code (i.e. so can determine which years actually burned)
@@ -457,7 +465,7 @@ Export.image.toAsset({
   maxPixels: 1e13, 
   scale: scale, 
   region: region,
-  crs: wkt
+  crs: fns.wktUSGS
 });
 
 }
