@@ -23,8 +23,8 @@ var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
 var scale = 30;
 var startYear = 1986;
 var endYear = 2020;
-var testRun = true; // is this just a test run?
-var runExports = false; //export assets?
+var testRun = false; // is this just a test run?
+var runExports = true; //export assets?
 var date = "20221213"; // for appending to output names
 
 
