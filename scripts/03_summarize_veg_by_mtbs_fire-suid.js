@@ -16,7 +16,7 @@ Also output the amount of area belonging to each suidBinSevSimple
 // Constants
 
 var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
-var scale = 30;
+var scale = 90;
 var testRun = false; //true; //  is this just a test run--if so code run for a very small area
 var runExports = true; // whether to export csv files
 var startYear = 1986;
