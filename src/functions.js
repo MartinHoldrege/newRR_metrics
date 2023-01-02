@@ -61,7 +61,7 @@ var meanByGroup = exports.meanByGroup = function(image, bandName, groupName, reg
   // that contains the mean cover value, name of the image band the mean is of
   // the suidBin, and the year the image is from
   // not converting to ee.List to avoid unnecessary recasting 
-  var meanDict2 = meanDict.get('groups').map(function(key, x) {
+  var meanDict2 = ee.Dictionary(meanDict.get('groups')).map(function(key, x) {
     var dict =       
         {
       // area in m^2
@@ -108,7 +108,7 @@ exports.areaByGroup = function(image, groupName, region, scale) {
   // to a csv
   
   // dictionary where each component is a feature
-  var areasDict = areas.get('groups').map(function (key, x) {
+  var areasDict = ee.Dictionary(areas.get('groups')).map(function (key, x) {
     
     var dict = {area_m2: ee.Dictionary(x).get('sum')};
     
