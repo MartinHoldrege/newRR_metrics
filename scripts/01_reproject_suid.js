@@ -14,13 +14,13 @@ Date Started: 12/9/2022
 var fns = require("users/mholdrege/newRR_metrics:src/functions.js");
 
 // constants
-var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
+var pathAsset = 'projects/usgs-gee-drylandecohydrology/assets/newRR_metrics/';
 
 // read in data
 var suid1 = ee.Image(pathAsset + 'suid/gsu_masked_v20220314')
   .rename('suid');
   
-var region = ee.FeatureCollection("projects/gee-guest/assets/SEI/US_Sagebrush_Biome_2019") // provided by DT 
+var region = ee.FeatureCollection("projects/usgs-gee-drylandecohydrology/assets/SEI/US_Sagebrush_Biome_2019") // provided by DT 
   .geometry();
 // save file
 

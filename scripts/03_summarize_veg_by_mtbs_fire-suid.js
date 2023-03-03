@@ -15,7 +15,7 @@ Also output the amount of area belonging to each suidBinSevSimple
 
 // Constants
 
-var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
+var pathAsset = 'projects/usgs-gee-drylandecohydrology/assets/newRR_metrics/';
 var scale = 90;
 var testRun = false; //true; //  is this just a test run--if so code run for a very small area
 var runExports = true; // whether to export csv files
@@ -51,7 +51,7 @@ var mask = suid1.neq(0).unmask().rename('mask');
 Map.addLayer(mask, {min: 0, max: 1, palette: ['white', 'black']}, 'mask', false);
 // region of interest
 
-var biome = ee.FeatureCollection("projects/gee-guest/assets/SEI/US_Sagebrush_Biome_2019"); // provided by DT
+var biome = ee.FeatureCollection("projects/usgs-gee-drylandecohydrology/assets/SEI/US_Sagebrush_Biome_2019"); // provided by DT
 
 
 if (testRun) {

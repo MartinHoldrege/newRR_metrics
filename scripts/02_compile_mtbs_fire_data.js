@@ -19,7 +19,7 @@ Started: 11/29/2022
 
 // Constants
 
-var pathAsset = 'projects/gee-guest/assets/newRR_metrics/';
+var pathAsset = 'projects/usgs-gee-drylandecohydrology/assets/newRR_metrics/';
 var scale = 30;
 var startYear = 1986;
 var endYear = 2020;
@@ -52,7 +52,7 @@ var mask = suid1.unmask().neq(0).rename('mask');
 Map.addLayer(mask, {min: 0, max: 1, palette: ['white', 'black']}, 'mask', false, 0.5);
 // region of interest
 
-var biome = ee.FeatureCollection("projects/gee-guest/assets/SEI/US_Sagebrush_Biome_2019"); // provided by DT
+var biome = ee.FeatureCollection("projects/usgs-gee-drylandecohydrology/assets/SEI/US_Sagebrush_Biome_2019"); // provided by DT
 
 
 if (testRun) {
