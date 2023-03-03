@@ -57,10 +57,11 @@ var meanByGroup = exports.meanByGroup = function(image, bandName, groupName, reg
     maxPixels: 1e12
   });
   
-  // return a list where each element is a feature
+  // return a dictionary where each element is a feature
   // that contains the mean cover value, name of the image band the mean is of
   // the suidBin, and the year the image is from
-  var meanList = ee.List(meanDict.get('groups')).map(function (x) {
+  // not converting to ee.List to avoid unnecessary recasting 
+  var meanDict2 = ee.Dictionary(meanDict.get('groups')).map(function(key, x) {
     var dict =       
         {
       // area in m^2
@@ -74,7 +75,7 @@ var meanByGroup = exports.meanByGroup = function(image, bandName, groupName, reg
     return f;
     });
   
-  return ee.FeatureCollection(meanList);
+  return ee.FeatureCollection(meanDict2);
 };
 
 /**
@@ -106,8 +107,8 @@ exports.areaByGroup = function(image, groupName, region, scale) {
   // converting dictionary to a feature collection so that it can be output
   // to a csv
   
-  // list where each component is a feature
-  var areasList = ee.List(areas.get('groups')).map(function (x) {
+  // dictionary where each component is a feature
+  var areasDict = ee.Dictionary(areas.get('groups')).map(function (key, x) {
     
     var dict = {area_m2: ee.Dictionary(x).get('sum')};
     
@@ -117,7 +118,7 @@ exports.areaByGroup = function(image, groupName, region, scale) {
     return ee.Feature(null, dict);
   });
   
-  var areasFc = ee.FeatureCollection(areasList);
+  var areasFc = ee.FeatureCollection(areasDict);
   
   return areasFc;
 };
